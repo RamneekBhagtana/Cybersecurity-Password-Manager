@@ -1,8 +1,11 @@
 from flask import Flask
 import os
+import logging
+import traceback
 from dotenv import load_dotenv
 
-from extensions import db, migrate  
+from extensions import db, migrate
+from models import User, VaultEntry, Tag, VaultEntryTag
 
 load_dotenv()
 
@@ -13,8 +16,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 migrate.init_app(app, db)
-
-from models import User, VaultEntry, Tag, VaultEntryTag
 
 @app.route('/')
 def home():
@@ -28,7 +29,8 @@ def test_tables():
             "vault_entries": VaultEntry.query.count()
         }
     except Exception as e:
-        return {"error": str(e)}
+        logging.error("Error while testing tables:\n%s", traceback.format_exc())
+        return {"error": "An internal error occurred."}, 500
 
 @app.route('/test-tags')
 def test_tags():
@@ -48,9 +50,11 @@ def test_tags():
         )
         db.session.add(entry)
 
-        tag = Tag(user_id=user.id, name="school")
-        db.session.add(tag)
-        db.session.commit()
+        tag = Tag.query.filter_by(user_id=user.id, name="school").first()
+        if not tag:
+            tag = Tag(user_id=user.id, name="school")
+            db.session.add(tag)
+            db.session.commit()
 
         link = VaultEntryTag(
             vault_entry_id=entry.id,
@@ -69,7 +73,9 @@ def test_tags():
         }
 
     except Exception as e:
-        return {"error": str(e)}
+        logging.error("Error while testing tags:\n%s", traceback.format_exc())
+        return {"error": "An internal error occurred."}, 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    debug_mode = os.getenv('FLASK_DEBUG', 'false').lower() in ('1', 'true', 'yes')
+    app.run(debug=debug_mode)
