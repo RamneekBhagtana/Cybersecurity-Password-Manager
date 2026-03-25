@@ -67,7 +67,6 @@ def generate_password(
     # -------------------------
     secrets.SystemRandom().shuffle(password_chars)
 
-    # ✅ THESE MUST BE INDENTED
     password = "".join(password_chars)
 
     strength = zxcvbn(password)
