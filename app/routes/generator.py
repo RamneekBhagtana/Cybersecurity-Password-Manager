@@ -1,3 +1,4 @@
+import logging
 from app.middleware.auth import require_auth
 from flask import Blueprint, request, jsonify
 from app.utils.password_generator import generate_password
@@ -12,18 +13,20 @@ def generate_password_endpoint():
 
     try:
         result = generate_password(
-    length=data.get("length", 16),
-    include_uppercase=data.get("include_uppercase", True),
-    include_lowercase=data.get("include_lowercase", True),
-    include_numbers=data.get("include_numbers", True),
-    include_special=data.get("include_special", True),
-    min_numbers=data.get("min_numbers", 1),
-    min_special=data.get("min_special", 1)
-)
+            length=data.get("length", 16),
+            include_uppercase=data.get("include_uppercase", True),
+            include_lowercase=data.get("include_lowercase", True),
+            include_numbers=data.get("include_numbers", True),
+            include_special=data.get("include_special", True),
+            min_numbers=data.get("min_numbers", 1),
+            min_special=data.get("min_special", 1)
+        )
 
         return jsonify(result)
 
     except ValueError as e:
+        logging.exception("Error generating password")
+
         return jsonify({
-            "error": str(e)
+            "error": "Invalid input for password generation"
         }), 400
