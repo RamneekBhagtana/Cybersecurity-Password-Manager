@@ -19,4 +19,7 @@ def create_app(config_class=Config):
     from app.routes.health import health_bp
     app.register_blueprint(health_bp)
 
+    from app.routes.service import strength_bp
+    app.register_blueprint(strength_bp)
+
     return app
