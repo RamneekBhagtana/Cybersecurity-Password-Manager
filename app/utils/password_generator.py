@@ -23,6 +23,12 @@ def generate_password(
     if not (include_uppercase or include_lowercase or include_numbers or include_special):
         raise ValueError("At least one character type must be selected")
 
+    if not include_numbers and min_numbers > 0:
+        raise ValueError("Cannot require numbers if numbers are excluded")
+
+    if not include_special and min_special > 0:
+        raise ValueError("Cannot require special characters if they are excluded")
+
     if min_numbers + min_special > length:
         raise ValueError("Minimum counts exceed total length")
 
@@ -75,6 +81,7 @@ def generate_password(
         "password": password,
         "strength": {
             "score": strength["score"],
-            "feedback": strength["feedback"]
+            "feedback": strength["feedback"],
+            "crack_time": strength["crack_times_display"]["offline_fast_hashing_1e10_per_second"]
         }
     }

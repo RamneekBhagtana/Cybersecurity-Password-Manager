@@ -1,10 +1,13 @@
-import os
 from flask import Flask
+from dotenv import load_dotenv
+import os
 from app.routes.generator import generator_bp
 
-app = Flask(__name__)
+# Load environment variables
+load_dotenv(dotenv_path=".env", encoding="utf-8")
 
-app.register_blueprint(generator_bp)
+app = Flask(__name__)
+app.register_blueprint(generator_bp, url_prefix="/api")
 
 if __name__ == "__main__":
     debug = os.getenv("FLASK_DEBUG", "0").lower() in ["1", "true", "yes"]

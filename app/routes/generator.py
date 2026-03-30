@@ -1,10 +1,9 @@
 import logging
-from app.middleware.auth import require_auth
 from flask import Blueprint, request, jsonify
+from app.middleware.auth import require_auth
 from app.utils.password_generator import generate_password
 
 generator_bp = Blueprint("generator", __name__)
-
 
 @generator_bp.route("/generate/password", methods=["POST"])
 @require_auth
@@ -21,12 +20,7 @@ def generate_password_endpoint():
             min_numbers=data.get("min_numbers", 1),
             min_special=data.get("min_special", 1)
         )
-
         return jsonify(result)
-
-    except ValueError as e:
-        logging.exception("Error generating password")
-
-        return jsonify({
-            "error": "Invalid input for password generation"
-        }), 400
+    except ValueError:
+        logging.warning("Invalid password generation input")
+        return jsonify({"error": "Invalid input for password generation"}), 400
