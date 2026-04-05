@@ -105,7 +105,7 @@ export default function GeneratorScreen() {
                 <View style={styles.passwordCard}>
                     <Text style={styles.passwordText}>{password}</Text>
                     <View style={styles.strengthBar}>
-                        <View style={[styles.strengthFill, { width: strength.width as any, backgroundColor: strength.color }]} />
+                        <View style={[styles.strengthFill, { flex: strength.score / 4, backgroundColor: strength.color }]} />
                     </View>
                     <Text style={[styles.strengthLabel, { color: strength.color }]}>
                         {strength.label}
@@ -244,9 +244,10 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         marginBottom: 6,
         overflow: 'hidden',
+        flexDirection: 'row',
     },
     strengthFill: {
-        height: '100%',
+        height: 6,
         borderRadius: 3,
     },
     strengthLabel: {
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
         overflow: 'visible',
     },
     sliderFill: {
-        height: '100%',
+        height: 6,
         backgroundColor: PURPLE,
         borderRadius: 3,
     },
