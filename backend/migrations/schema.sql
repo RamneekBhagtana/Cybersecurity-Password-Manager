@@ -68,25 +68,11 @@ CREATE TABLE generator_settings (
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. security_reports table
-CREATE TABLE security_reports (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    report_type     VARCHAR(50) NOT NULL,
-    vault_entry_id  UUID REFERENCES vault_entries(id) ON DELETE SET NULL,
-    severity        VARCHAR(20) NOT NULL,
-    details         TEXT,
-    is_resolved     BOOLEAN DEFAULT FALSE,
-    generated_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- ============================================================
 -- Indexes
 -- ============================================================
 CREATE INDEX idx_vault_entries_user_id ON vault_entries(user_id);
 CREATE INDEX idx_tags_user_id ON tags(user_id);
-CREATE INDEX idx_security_reports_user_id ON security_reports(user_id);
-CREATE INDEX idx_security_reports_type ON security_reports(report_type);
 
 -- ============================================================
 -- Row Level Security (RLS)
@@ -96,7 +82,6 @@ ALTER TABLE vault_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vault_entry_tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE generator_settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE security_reports ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users_own_row" ON users
     USING (id = auth.uid());
@@ -115,9 +100,6 @@ CREATE POLICY "vault_entry_tags_own_rows" ON vault_entry_tags
     );
 
 CREATE POLICY "generator_settings_own_rows" ON generator_settings
-    USING (user_id = auth.uid());
-
-CREATE POLICY "security_reports_own_rows" ON security_reports
     USING (user_id = auth.uid());
 
 -- ============================================================
