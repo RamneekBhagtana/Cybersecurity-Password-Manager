@@ -52,7 +52,7 @@ def require_auth(f):
         except jwt.ExpiredSignatureError:
             return jsonify({"error": "Token has expired", "code": 401}), 401
         except jwt.InvalidTokenError as e:
-            return jsonify({"error": f"Invalid token: {str(e)}", "code": 401}), 401
+            return jsonify({"error": f"Invalid token", "code": 401}), 401
 
         # Extract user ID from 'sub' claim and attach to Flask's g object
         user_id = payload.get("sub")
