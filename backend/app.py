@@ -4,6 +4,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from dotenv import load_dotenv
 from app.routes import register_routes
+from app.routes.passphrase import generator_bp
+
 
 load_dotenv()
 
