@@ -5,7 +5,7 @@ from app.services.auth_service import require_auth # type: ignore
 generator_bp = Blueprint('generator', __name__)
 
 @generator_bp.route('/generate/passphrase', methods=['POST'])
-# @require_auth
+@require_auth
 def handle_passphrase_generation():
     data = request.get_json(silent=True) or {}
     
