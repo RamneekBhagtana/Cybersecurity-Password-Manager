@@ -19,4 +19,7 @@ def create_app(config_class=Config):
     from app.routes.health import health_bp
     app.register_blueprint(health_bp)
 
+    from app.routes.vault import vault_bp
+    app.register_blueprint(vault_bp)
+
     return app
