@@ -27,3 +27,5 @@ SQLAlchemy==2.0.48
 typing_extensions==4.15.0
 Werkzeug==3.1.6
 zxcvbn-python==4.4.24
+flask-jwt-extended==4.6.0
+pytest-cov==5.0.0
