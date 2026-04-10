@@ -1,8 +1,10 @@
 from functools import wraps
 from flask import Blueprint, request, jsonify, g
 from app.services.strength_service import check_strength
+import logging
 
 strength_bp = Blueprint('strength', __name__)
+logger = logging.getLogger(__name__)
 
 #Auth Middleware
 def require_auth(f):
@@ -30,6 +32,7 @@ def strength_checker():
     try:
         result = check_strength(password)
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        logger.exception("Error while checking password strength")
+        return jsonify({"error": "Invalid password"}), 400
     
     return jsonify(result), 200
