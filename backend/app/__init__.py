@@ -21,5 +21,7 @@ def create_app(config_class=Config):
 
     from app.routes.service import strength_bp
     app.register_blueprint(strength_bp)
+    from app.routes.vault import vault_bp
+    app.register_blueprint(vault_bp)
 
     return app
