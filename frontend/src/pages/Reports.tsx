@@ -18,7 +18,7 @@ export default function Reports() {
         <Card>
           <p className="text-sm text-[var(--muted)]">No reports yet.</p>
           <p className="mt-2 text-sm">
-            Add your report UI later if Task 21 requires it.
+            
           </p>
         </Card>
       </div>
