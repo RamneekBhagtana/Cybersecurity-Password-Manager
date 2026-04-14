@@ -9,10 +9,6 @@ import Generator from './pages/Generator';
 import Reports from './pages/Reports';
 import Profile from './pages/Profile';
 
-<div className="bg-red-500 text-white p-4">
-  Tailwind works
-</div>
-
 function App() {
   return (
     <BrowserRouter>

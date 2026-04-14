@@ -1,5 +1,6 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import Button from "../components/ui/Button";
+import { supabase } from "../lib/supabase";
 
 type Props = {
   children: React.ReactNode;
@@ -15,7 +16,8 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 export default function AppLayout({ children }: Props) {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate("/login");
   };
 

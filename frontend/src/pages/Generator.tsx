@@ -4,14 +4,72 @@ import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Toggle from "../components/ui/Toggle";
 
-function generatePassword(length: number) {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
-  let out = "";
-  for (let i = 0; i < length; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)];
+// secure random helper
+function secureRandomInt(max: number) {
+  if (max <= 0) return 0;
+
+  const array = new Uint32Array(1);
+  const limit = Math.floor(0xffffffff / max) * max;
+
+  let value = 0;
+  do {
+    crypto.getRandomValues(array);
+    value = array[0];
+  } while (value >= limit);
+
+  return value % max;
+}
+
+// shuffle array securely
+function shuffle<T>(items: T[]) {
+  const array = [...items];
+
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = secureRandomInt(i + 1);
+    [array[i], array[j]] = [array[j], array[i]];
   }
-  return out;
+
+  return array;
+}
+
+//  secure password generator
+function generatePassword(
+  length: number,
+  options: {
+    upper: boolean;
+    lower: boolean;
+    numbers: boolean;
+    special: boolean;
+  }
+) {
+  const upperChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lowerChars = "abcdefghijklmnopqrstuvwxyz";
+  const numberChars = "0123456789";
+  const specialChars = "!@#$%^&*()_+";
+
+  const sets = [
+    options.upper ? upperChars : "",
+    options.lower ? lowerChars : "",
+    options.numbers ? numberChars : "",
+    options.special ? specialChars : "",
+  ].filter(Boolean);
+
+  const pool =
+    sets.join("") || `${upperChars}${lowerChars}${numberChars}${specialChars}`;
+
+  const result: string[] = [];
+
+  // ensure at least 1 char from each enabled set
+  for (const set of sets) {
+    result.push(set[secureRandomInt(set.length)]);
+  }
+
+  // fill remaining
+  while (result.length < length) {
+    result.push(pool[secureRandomInt(pool.length)]);
+  }
+
+  return shuffle(result).join("");
 }
 
 export default function Generator() {
@@ -20,17 +78,44 @@ export default function Generator() {
   const [useLower, setUseLower] = useState(true);
   const [useNumbers, setUseNumbers] = useState(true);
   const [useSpecial, setUseSpecial] = useState(true);
-  const [mode, setMode] = useState<"password" | "passphrase">("password");
-  const [password, setPassword] = useState(() => generatePassword(16));
+
+  const [password, setPassword] = useState(() =>
+    generatePassword(16, {
+      upper: true,
+      lower: true,
+      numbers: true,
+      special: true,
+    })
+  );
 
   const strength = useMemo(() => {
-    if (password.length >= 20) return "Strong";
-    if (password.length >= 12) return "Good";
+    let score =
+      (useUpper ? 1 : 0) +
+      (useLower ? 1 : 0) +
+      (useNumbers ? 1 : 0) +
+      (useSpecial ? 1 : 0);
+
+    if (length >= 20) score += 1;
+
+    if (score >= 5) return "Very Strong";
+    if (score >= 4) return "Strong";
+    if (score >= 3) return "Good";
     return "Weak";
-  }, [password]);
+  }, [length, useUpper, useLower, useNumbers, useSpecial]);
 
   const regenerate = () => {
-    setPassword(generatePassword(length));
+    setPassword(
+      generatePassword(length, {
+        upper: useUpper,
+        lower: useLower,
+        numbers: useNumbers,
+        special: useSpecial,
+      })
+    );
+  };
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(password);
   };
 
   return (
@@ -46,29 +131,6 @@ export default function Generator() {
           </p>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMode("password")}
-            className={`rounded-full px-4 py-2 text-sm font-medium ${
-              mode === "password"
-                ? "bg-[var(--primary)] text-white"
-                : "bg-white text-[var(--muted)]"
-            }`}
-          >
-            Password
-          </button>
-          <button
-            onClick={() => setMode("passphrase")}
-            className={`rounded-full px-4 py-2 text-sm font-medium ${
-              mode === "passphrase"
-                ? "bg-[var(--primary)] text-white"
-                : "bg-white text-[var(--muted)]"
-            }`}
-          >
-            Passphrase
-          </button>
-        </div>
-
         <Card>
           <div className="space-y-4">
             <div className="rounded-[24px] bg-[var(--surface-2)] p-4">
@@ -81,7 +143,9 @@ export default function Generator() {
                 <p className="font-semibold">{strength}</p>
               </div>
               <div className="flex gap-2">
-                <Button variant="secondary">Copy</Button>
+                <Button variant="secondary" onClick={handleCopy}>
+                  Copy
+                </Button>
                 <Button onClick={regenerate}>New</Button>
               </div>
             </div>
@@ -105,10 +169,26 @@ export default function Generator() {
           </div>
 
           <div className="grid gap-3">
-            <Toggle checked={useUpper} onChange={setUseUpper} label="Uppercase letters" />
-            <Toggle checked={useLower} onChange={setUseLower} label="Lowercase letters" />
-            <Toggle checked={useNumbers} onChange={setUseNumbers} label="Numbers" />
-            <Toggle checked={useSpecial} onChange={setUseSpecial} label="Special characters" />
+            <Toggle
+              checked={useUpper}
+              onChange={setUseUpper}
+              label="Uppercase letters"
+            />
+            <Toggle
+              checked={useLower}
+              onChange={setUseLower}
+              label="Lowercase letters"
+            />
+            <Toggle
+              checked={useNumbers}
+              onChange={setUseNumbers}
+              label="Numbers"
+            />
+            <Toggle
+              checked={useSpecial}
+              onChange={setUseSpecial}
+              label="Special characters"
+            />
           </div>
         </Card>
       </div>
