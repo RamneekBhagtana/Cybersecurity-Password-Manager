@@ -1,12 +1,37 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { VaultEntry } from "../types/vault";
 import Card from "./ui/Card";
+import { deleteVaultEntry } from "../services/vault";
 
 type Props = {
   entry: VaultEntry;
   onDeleted?: (id: string) => void;
   onEdit?: (entry: VaultEntry) => void;
 };
+
+function MenuItem({
+  children,
+  danger = false,
+  onClick,
+}: {
+  children: ReactNode;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full px-4 py-3 text-left text-sm transition ${
+        danger
+          ? "text-red-600 hover:bg-red-50"
+          : "text-slate-900 hover:bg-slate-100"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function VaultEntryCard({ entry, onDeleted, onEdit }: Props) {
   const [revealed, setRevealed] = useState(false);
@@ -15,18 +40,17 @@ export default function VaultEntryCard({ entry, onDeleted, onEdit }: Props) {
   const [deleting, setDeleting] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // close menu when clicking outside
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
     };
+
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // copy password
   const handleCopy = async () => {
     await navigator.clipboard.writeText(entry.password);
     setCopied(true);
@@ -34,14 +58,16 @@ export default function VaultEntryCard({ entry, onDeleted, onEdit }: Props) {
     setMenuOpen(false);
   };
 
-  // delete
   const handleDelete = async () => {
     const ok = window.confirm(`Delete ${entry.siteName}?`);
     if (!ok) return;
 
     setDeleting(true);
     try {
+      await deleteVaultEntry(entry.id);
       onDeleted?.(entry.id);
+    } catch {
+      alert("Could not delete this entry. Please try again.");
     } finally {
       setDeleting(false);
       setMenuOpen(false);
@@ -53,7 +79,6 @@ export default function VaultEntryCard({ entry, onDeleted, onEdit }: Props) {
     setMenuOpen(false);
   };
 
-  // favicon
   const favicon = entry.website
     ? `https://www.google.com/s2/favicons?domain=${entry.website}&sz=64`
     : null;
@@ -62,11 +87,7 @@ export default function VaultEntryCard({ entry, onDeleted, onEdit }: Props) {
 
   return (
     <Card className="flex items-center justify-between gap-4">
-      
-      {/* LEFT SIDE (icon + text) */}
       <div className="flex items-center gap-4">
-        
-        {/* ICON */}
         {favicon ? (
           <img
             src={favicon}
@@ -82,7 +103,6 @@ export default function VaultEntryCard({ entry, onDeleted, onEdit }: Props) {
           </div>
         )}
 
-        {/* TEXT */}
         <div>
           <h3 className="text-lg font-semibold text-[var(--text)]">
             {entry.siteName}
@@ -94,47 +114,30 @@ export default function VaultEntryCard({ entry, onDeleted, onEdit }: Props) {
         </div>
       </div>
 
-      {/* RIGHT SIDE MENU */}
       <div className="relative" ref={menuRef}>
         <button
+          type="button"
           onClick={() => setMenuOpen((v) => !v)}
-          className="rounded-full px-3 py-1 text-2xl text-slate-700 hover:bg-slate-100"
+          aria-label="More options"
+          className="rounded-full px-3 py-1 text-2xl leading-none text-slate-700 hover:bg-slate-100"
         >
           ⋯
         </button>
 
-        {menuOpen && (
+        {menuOpen ? (
           <div className="absolute right-0 top-12 z-30 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-            
-            <button
-              onClick={() => setRevealed((v) => !v)}
-              className="w-full px-4 py-3 text-left text-sm hover:bg-slate-100"
-            >
+            <MenuItem onClick={() => setRevealed((v) => !v)}>
               {revealed ? "Hide" : "Show"}
-            </button>
-
-            <button
-              onClick={handleCopy}
-              className="w-full px-4 py-3 text-left text-sm hover:bg-slate-100"
-            >
+            </MenuItem>
+            <MenuItem onClick={handleCopy}>
               {copied ? "Copied" : "Copy"}
-            </button>
-
-            <button
-              onClick={handleEdit}
-              className="w-full px-4 py-3 text-left text-sm hover:bg-slate-100"
-            >
-              Edit
-            </button>
-
-            <button
-              onClick={handleDelete}
-              className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50"
-            >
+            </MenuItem>
+            <MenuItem onClick={handleEdit}>Edit</MenuItem>
+            <MenuItem danger onClick={handleDelete}>
               {deleting ? "Deleting..." : "Delete"}
-            </button>
+            </MenuItem>
           </div>
-        )}
+        ) : null}
       </div>
     </Card>
   );
