@@ -1,15 +1,52 @@
+import { useState } from "react";
 import AppLayout from "../layouts/AppLayout";
-import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
+import VaultEntryCard from "../components/VaultEntryCard";
+import type { VaultEntry } from "../types/vault";
 
-const items = [
-  { name: "Netflix", user: "adrita@email.com", category: "Personal", dot: "bg-red-400" },
-  { name: "GitHub", user: "adrita.dev", category: "Work", dot: "bg-slate-400" },
-  { name: "Notion", user: "adrita.study", category: "School", dot: "bg-blue-400" },
-  { name: "Discord", user: "adrita#2048", category: "Personal", dot: "bg-purple-400" },
+const initialItems: VaultEntry[] = [
+  {
+    id: "1",
+    siteName: "Netflix",
+    website: "netflix.com",
+    username: "adrita@email.com",
+    password: "netflix-password-123",
+    tag: "Personal",
+  },
+  {
+    id: "2",
+    siteName: "GitHub",
+    website: "github.com",
+    username: "adrita.dev",
+    password: "github-password-123",
+    tag: "Work",
+  },
+  {
+    id: "3",
+    siteName: "Notion",
+    website: "notion.com",
+    username: "adrita.study",
+    password: "notion-password-123",
+    tag: "School",
+  },
+  {
+    id: "4",
+    siteName: "Discord",
+    website: "Discord.com",
+    username: "adrita#2048",
+    password: "discord-password-123",
+    tag: "Personal",
+  },
 ];
 
 export default function Vault() {
+  const [entries, setEntries] = useState<VaultEntry[]>(initialItems);
+  const [editingEntry, setEditingEntry] = useState<VaultEntry | null>(null);
+
+  const handleDeleted = (id: string) => {
+    setEntries((prev) => prev.filter((entry) => entry.id !== id));
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -30,7 +67,7 @@ export default function Vault() {
           {["All", "Work", "Personal", "School"].map((tag, index) => (
             <button
               key={tag}
-              className={`rounded-full px-4 py-2 text-sm font-medium ${
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                 index === 0
                   ? "bg-[var(--primary)] text-white"
                   : "bg-white text-[var(--muted)]"
@@ -42,21 +79,38 @@ export default function Vault() {
         </div>
 
         <div className="space-y-3">
-          {items.map((item) => (
-            <Card key={item.name} className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className={`h-3 w-3 rounded-full ${item.dot}`} />
-                <div>
-                  <h3 className="font-semibold">{item.name}</h3>
-                  <p className="text-sm text-[var(--muted)]">{item.user}</p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">{item.category}</p>
-                </div>
-              </div>
-              <div className="text-xl text-[var(--muted)]">›</div>
-            </Card>
+          {entries.map((entry) => (
+            <VaultEntryCard
+              key={entry.id}
+              entry={entry}
+              onDeleted={handleDeleted}
+              onEdit={(item) => setEditingEntry(item)}
+            />
           ))}
         </div>
       </div>
+
+      {editingEntry ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-bold">Edit entry</h2>
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              Task 23 will replace this with the real edit form.
+            </p>
+
+            <div className="mt-4 rounded-2xl bg-[var(--surface-2)] p-4">
+              <p className="font-semibold">{editingEntry.siteName}</p>
+              <p className="text-sm text-[var(--muted)]">{editingEntry.username}</p>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <Button variant="secondary" onClick={() => setEditingEntry(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AppLayout>
   );
 }
