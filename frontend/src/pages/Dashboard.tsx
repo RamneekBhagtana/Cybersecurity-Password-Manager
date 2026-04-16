@@ -1,47 +1,49 @@
 import { Link } from "react-router-dom";
+import { useMemo, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import Card from "../components/ui/Card";
 import VaultEntryCard from "../components/VaultEntryCard";
-import type { VaultEntry } from "../types/vault";
-import { useState } from "react";
-
-const initialEntries: VaultEntry[] = [
-  {
-    id: "1",
-    siteName: "Netflix",
-    website: "netflix.com",
-    username: "adrita@email.com",
-    password: "netflix-password-123",
-    tag: "Personal",
-  },
-  {
-    id: "2",
-    siteName: "GitHub",
-    website: "github.com",
-    username: "adrita.dev",
-    password: "github-password-123",
-    tag: "Work",
-  },
-  {
-    id: "3",
-    siteName: "Notion",
-    website: "notion.so",
-    username: "adrita.study",
-    password: "notion-password-123",
-    tag: "School",
-  },
-];
+import VaultFilters from "../components/VaultFilters";
+import { useVaultEntries } from "../hooks/useVaultEntries";
+import { filterVaultEntries, getUniqueTags } from "../utils/vaultFilters";
 
 export default function Dashboard() {
-  const [entries, setEntries] = useState<VaultEntry[]>(initialEntries);
+  const { entries, loading, error, reload, removeEntry } = useVaultEntries();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  const tags = useMemo(() => getUniqueTags(entries), [entries]);
+
+  const filteredEntries = useMemo(
+    () => filterVaultEntries(entries, searchTerm, selectedTags),
+    [entries, searchTerm, selectedTags]
+  );
 
   const stats = [
-    { label: "Saved passwords", value: "24" },
+    { label: "Saved passwords", value: String(entries.length) },
     { label: "Strong passwords", value: "18" },
     { label: "Security score", value: "92%" },
   ];
 
-  const recentEntries = entries.slice(0, 2);
+  const toggleTag = (tag: string) => {
+    if (tag === "All") {
+      setSelectedTags([]);
+      return;
+    }
+
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]
+    );
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedTags([]);
+  };
+
+  const hasActiveFilters = searchTerm.trim().length > 0 || selectedTags.length > 0;
+  const noMatches =
+    !loading && !error && filteredEntries.length === 0 && entries.length > 0;
 
   return (
     <AppLayout>
@@ -52,9 +54,24 @@ export default function Dashboard() {
           </p>
           <h1 className="mt-2 text-3xl font-bold">Dashboard</h1>
           <p className="mt-2 max-w-2xl text-sm text-white/75">
-            Track your vault activity, check your security status, and jump into your most recent entries.
+            Track your vault activity, search credentials quickly, and jump into your recent entries.
           </p>
         </div>
+
+        {loading ? (
+          <Card>Loading vault...</Card>
+        ) : error ? (
+          <Card className="space-y-3">
+            <p className="text-sm font-medium text-[var(--danger)]">{error}</p>
+            <button
+              type="button"
+              onClick={reload}
+              className="text-sm font-semibold text-[var(--primary)] hover:underline"
+            >
+              Try again
+            </button>
+          </Card>
+        ) : null}
 
         <div className="grid gap-4 md:grid-cols-3">
           {stats.map((item) => (
@@ -65,13 +82,24 @@ export default function Dashboard() {
           ))}
         </div>
 
+        <VaultFilters
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          tags={tags}
+          selectedTags={selectedTags}
+          onToggleTag={toggleTag}
+          onClearFilters={clearFilters}
+          filteredCount={filteredEntries.length}
+          totalCount={entries.length}
+        />
+
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
           <Card className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-bold">Recent entries</h2>
+                <h2 className="text-xl font-bold">Vault entries</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
-                  A quick look at your latest saved passwords.
+                  Your saved passwords at a glance.
                 </p>
               </div>
 
@@ -84,17 +112,36 @@ export default function Dashboard() {
             </div>
 
             <div className="space-y-3">
-              {recentEntries.map((entry) => (
-                <VaultEntryCard
-                  key={entry.id}
-                  entry={entry}
-                  onDeleted={(id) =>
-                    setEntries((prev) => prev.filter((item) => item.id !== id))
-                  }
-                  onEdit={(item) => console.log("edit", item)}
-                />
-              ))}
+              {noMatches ? (
+                <div className="rounded-[24px] bg-[var(--surface-2)] p-4">
+                  <p className="text-sm font-medium text-[var(--text)]">
+                    No passwords match your filters.
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Clear the search or tag filters to see more results.
+                  </p>
+                </div>
+              ) : filteredEntries.length === 0 ? (
+                <p className="rounded-[24px] bg-[var(--surface-2)] p-4 text-sm text-[var(--muted)]">
+                  No passwords saved yet.
+                </p>
+              ) : (
+                filteredEntries.slice(0, 2).map((entry) => (
+                  <VaultEntryCard
+                    key={entry.id}
+                    entry={entry}
+                    onDeleted={removeEntry}
+                    onEdit={(item) => console.log("edit", item)}
+                  />
+                ))
+              )}
             </div>
+
+            {hasActiveFilters && filteredEntries.length > 2 ? (
+              <p className="text-sm text-[var(--muted)]">
+                Showing the first 2 filtered entries here. Open Vault to see the full list.
+              </p>
+            ) : null}
           </Card>
 
           <Card className="space-y-4">

@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { VaultEntry } from "../types/vault";
 import Card from "./ui/Card";
-import { deleteVaultEntry } from "../services/vault";
 
 type Props = {
   entry: VaultEntry;
-  onDeleted?: (id: string) => void;
+  onDeleted?: (id: string) => Promise<void> | void;
   onEdit?: (entry: VaultEntry) => void;
 };
 
@@ -41,8 +40,8 @@ export default function VaultEntryCard({ entry, onDeleted, onEdit }: Props) {
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+    const handleClick = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
       }
     };
@@ -52,10 +51,15 @@ export default function VaultEntryCard({ entry, onDeleted, onEdit }: Props) {
   }, []);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(entry.password);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
-    setMenuOpen(false);
+    try {
+      await navigator.clipboard.writeText(entry.password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // no-op
+    } finally {
+      setMenuOpen(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -64,10 +68,7 @@ export default function VaultEntryCard({ entry, onDeleted, onEdit }: Props) {
 
     setDeleting(true);
     try {
-      await deleteVaultEntry(entry.id);
-      onDeleted?.(entry.id);
-    } catch {
-      alert("Could not delete this entry. Please try again.");
+      await onDeleted?.(entry.id);
     } finally {
       setDeleting(false);
       setMenuOpen(false);
