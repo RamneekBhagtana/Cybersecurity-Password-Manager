@@ -14,7 +14,7 @@ def create_app(config_class=Config):
 
     db.init_app(app)
     migrate.init_app(app, db)
-    cors.init_app(app)
+    cors.init_app(app, resources={r"/*": {"origins": "*", "allow_headers": ["Authorization", "Content-Type"]}})
 
     from app.routes.health import health_bp
     app.register_blueprint(health_bp)
