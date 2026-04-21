@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import GeneratorPage from './pages/GeneratorPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import Login from './pages/Login';
@@ -23,6 +24,7 @@ function App() {
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/generator" element={<GeneratorPage />} />
           <Route path="/vault" element={<Vault />} />
           <Route path="/generator" element={<Generator />} />
           <Route path="/reports" element={<Reports />} />
