@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { supabase } from './supabase';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:5000';
+// const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:5000';
+
+const BASE_URL = 'http://192.168.1.151:5000';
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
