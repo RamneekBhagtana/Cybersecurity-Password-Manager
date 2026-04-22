@@ -12,9 +12,13 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   async (config) => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      config.headers.Authorization = `Bearer ${session.access_token}`;
+
+    // If there is no session, cancel the request - don't send auth-less requests
+    if (!session?.access_token) {
+      return Promise.reject(new Error('No active session. Request aborted.'));
     }
+
+    config.headers.Authorization = `Bearer ${session.access_token}`;
     return config;
   },
   (error) => Promise.reject(error)
