@@ -1,27 +1,31 @@
+import os
+from dotenv import load_dotenv
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_cors import CORS
-from app.config import Config
 
-db = SQLAlchemy()
-migrate = Migrate()
-cors = CORS()
+from .extensions import db, migrate, cors
 
-def create_app(config_class=Config):
-    app = Flask(__name__)
-    app.config.from_object(config_class)
+load_dotenv()
 
-    db.init_app(app)
-    migrate.init_app(app, db)
-    cors.init_app(app, resources={r"/*": {"origins": "*", "allow_headers": ["Authorization", "Content-Type"]}})
 
-    from app.routes.health import health_bp
-    app.register_blueprint(health_bp)
+def create_app():
+    flask_app = Flask(__name__)
+    flask_app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+    flask_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    from app.routes.service import strength_bp
-    app.register_blueprint(strength_bp)
-    from app.routes.vault import vault_bp
-    app.register_blueprint(vault_bp)
+    # Bind extensions to this Flask app instance
+    db.init_app(flask_app)
+    migrate.init_app(flask_app, db)
+    cors.init_app(
+        flask_app,
+        resources={r"/*": {"origins": "*", "allow_headers": ["Authorization", "Content-Type"]}},
+    )
 
-    return app
+    # Register blueprints
+    from .routes.vault import vault_bp
+    flask_app.register_blueprint(vault_bp)
+
+    from .routes.generator import generator_bp
+    flask_app.register_blueprint(generator_bp)
+    # ...any other blueprints
+
+    return flask_app
