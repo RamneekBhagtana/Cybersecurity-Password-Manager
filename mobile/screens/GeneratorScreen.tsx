@@ -1,6 +1,6 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
-import Clipboard from '@react-native-clipboard/clipboard';
+import * as Clipboard from 'expo-clipboard';
 import {
     View,
     Text,
@@ -109,9 +109,9 @@ export default function GeneratorScreen() {
     }, [mode]);
 
     // ── Copy to clipboard ─────────────────────────────────────
-    const handleCopy = () => {
+    const handleCopy = async () => {
         if (!password) return;
-        Clipboard.setString(password);
+        await Clipboard.setStringAsync(password);
         Alert.alert('Copied!', 'Password copied to clipboard.');
     };
 
