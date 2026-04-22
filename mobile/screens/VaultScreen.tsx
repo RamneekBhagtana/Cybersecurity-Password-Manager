@@ -1,10 +1,10 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     FlatList,
     ActivityIndicator,
     Alert,
@@ -63,6 +63,11 @@ export default function VaultScreen() {
             const res = await apiClient.get('/vault');
             setEntries(res.data.entries ?? []);
         } catch (err: any) {
+            // Skip auth-abort errors silently - user isn't signed in yet
+            if (err.message?.includes('No active session')) {
+                setLoading(false);
+                return;
+            }
             const msg =
                 err.response?.data?.error?.message ??
                 err.message ??

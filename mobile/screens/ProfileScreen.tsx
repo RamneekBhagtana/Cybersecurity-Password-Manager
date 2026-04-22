@@ -1,16 +1,15 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     ScrollView,
     Switch,
     Alert,
     ActivityIndicator,
 } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../hooks/useSession';
 import apiClient from '../lib/apiClient';
@@ -85,12 +84,6 @@ export default function ProfileScreen() {
                 text: 'Sign Out',
                 style: 'destructive',
                 onPress: async () => {
-                    try {
-                        // Clear stored session token
-                        await SecureStore.deleteItemAsync('session_token');
-                    } catch {
-                        // Token may not exist - ignore
-                    }
                     // Sign out from Supabase (triggers auth state listener in App.tsx)
                     await supabase.auth.signOut();
                 },

@@ -1,13 +1,13 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {
     View,
     Text,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     ScrollView,
     Switch,
-    Clipboard,
     Alert,
     ActivityIndicator,
 } from 'react-native';
