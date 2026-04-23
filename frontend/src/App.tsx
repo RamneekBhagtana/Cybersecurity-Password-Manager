@@ -24,7 +24,6 @@ function App() {
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/generator" element={<GeneratorPage />} />
           <Route path="/vault" element={<Vault />} />
           <Route path="/generator" element={<Generator />} />
           <Route path="/reports" element={<Reports />} />

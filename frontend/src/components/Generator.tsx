@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { GeneratorMode, PasswordSettings, PassphraseSettings } from "../types/generator";
-import { fetchGeneratedSecret } from "../lib/api";
 import zxcvbn from "zxcvbn";
 
 interface GeneratorProps {

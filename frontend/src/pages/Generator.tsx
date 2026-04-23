@@ -122,9 +122,6 @@ export default function Generator() {
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--primary)]">
-            Generator
-          </p>
           <h1 className="mt-2 text-3xl font-bold">Password Generator</h1>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Create a strong password in one tap.
