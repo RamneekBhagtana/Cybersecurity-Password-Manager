@@ -1,16 +1,17 @@
-"""initial schema
+"""base schema anchor — represents 93f749a4212d (added cascade delete to tags)
 
-Revision ID: 0001_initial_schema
+Revision ID: 93f749a4212d
 Revises:
-Create Date: 2026-01-01
+Create Date: 2026-03-22
 
-This is a stub migration that represents the schema that already exists in the
-database (created via schema.sql / Supabase SQL Editor). It contains no
-upgrade/downgrade logic — its only purpose is to give Alembic a revision entry
-to anchor subsequent migrations against.
+This stub represents the latest migration that was applied to the database
+before Alembic was set up under backend/migrations/. The schema it covers
+(including the cascade-delete-on-tags change) already exists in the database;
+this entry exists only so Alembic can locate the revision stored in the
+alembic_version table and continue the chain forward.
 """
 
-revision = '0001_initial_schema'
+revision = '93f749a4212d'
 down_revision = None
 branch_labels = None
 depends_on = None

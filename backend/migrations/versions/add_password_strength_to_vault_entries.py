@@ -1,7 +1,7 @@
 """add password_strength to vault_entries
 
 Revision ID: a1b2c3d4e5f6
-Revises:
+Revises: 93f749a4212d
 Create Date: 2026-04-23
 
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'a1b2c3d4e5f6'
-down_revision = '0001_initial_schema'
+down_revision = '93f749a4212d'
 branch_labels = None
 depends_on = None
 
