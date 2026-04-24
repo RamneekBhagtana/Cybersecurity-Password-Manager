@@ -115,6 +115,16 @@ class VaultEntry(db.Model):
     )
 
     # ------------------------------------------------------------------ #
+    #  Password hash (SHA-256 of the plaintext password)                   #
+    #  Used solely for reuse detection — never exposes the plaintext.      #
+    # ------------------------------------------------------------------ #
+    password_hash = Column(
+        String(64),
+        nullable=True,
+        comment="SHA-256 hex digest of plaintext password — for reuse detection only",
+    )
+
+    # ------------------------------------------------------------------ #
     #  Encrypted credential — three columns, always used together          #
     # ------------------------------------------------------------------ #
     encrypted_password = Column(

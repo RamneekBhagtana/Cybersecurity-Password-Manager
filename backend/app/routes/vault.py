@@ -1,5 +1,6 @@
 #Task 15 — Password Vault CRUD API
 
+import hashlib
 import os
 import re
 from flask import Blueprint, request, jsonify, g
@@ -145,14 +146,28 @@ def _serialize_detail(entry: VaultEntry, key: bytes) -> tuple:
 @vault_bp.route("", methods=["GET"])
 @require_auth
 def get_vault():
-    """Returns all vault entries for the authenticated user. No passwords included."""
+    """Returns all vault entries for the authenticated user. No passwords included.
+    Also returns reused_count — number of entries whose password hash appears
+    more than once (requires password_hash to have been populated at save time).
+    """
     entries = (
         VaultEntry.query
         .filter_by(user_id=g.user_id)
         .order_by(VaultEntry.title)
         .all()
     )
-    return jsonify({"entries": [_serialize_summary(e) for e in entries]}), 200
+
+    # Count how many entries share a password_hash with at least one other entry.
+    hash_counts: dict[str, int] = {}
+    for e in entries:
+        if e.password_hash:
+            hash_counts[e.password_hash] = hash_counts.get(e.password_hash, 0) + 1
+    reused_count = sum(1 for e in entries if e.password_hash and hash_counts[e.password_hash] > 1)
+
+    return jsonify({
+        "entries": [_serialize_summary(e) for e in entries],
+        "reused_count": reused_count,
+    }), 200
 
 
 # POST /vault — create a new entry
@@ -195,6 +210,7 @@ def create_vault_entry():
         iv=iv,
         auth_tag=auth_tag,
         password_strength=_compute_strength(password),
+        password_hash=hashlib.sha256(password.encode()).hexdigest(),
     )
     db.session.add(entry)
     db.session.flush()
@@ -289,6 +305,7 @@ def update_vault_entry(entry_id):
         entry.iv = iv
         entry.auth_tag = auth_tag
         entry.password_strength = _compute_strength(new_password)
+        entry.password_hash = hashlib.sha256(new_password.encode()).hexdigest()
 
     if "tags" in data:
         entry.tags = _resolve_tags(data["tags"], g.user_id)
@@ -319,6 +336,7 @@ def recompute_strengths():
         try:
             plaintext = decrypt(entry.encrypted_password, entry.iv, entry.auth_tag, key)
             entry.password_strength = _compute_strength(plaintext)
+            entry.password_hash = hashlib.sha256(plaintext.encode()).hexdigest()
             updated += 1
         except DecryptionError:
             failed += 1

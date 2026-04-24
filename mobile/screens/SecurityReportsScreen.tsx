@@ -103,6 +103,7 @@ export default function SecurityReportsScreen() {
 
     const [total, setTotal] = useState<number | null>(null);
     const [weakCount, setWeakCount] = useState<number | null>(null);
+    const [reusedCount, setReusedCount] = useState<number | null>(null);
     const [statsLoading, setStatsLoading] = useState(true);
 
     // Fetch vault stats for the health summary
@@ -115,6 +116,7 @@ export default function SecurityReportsScreen() {
                 if (!cancelled) {
                     setTotal(entries.length);
                     setWeakCount(entries.filter((e: any) => e.password_strength === 1).length);
+                    setReusedCount(res.data.reused_count ?? 0);
                 }
             } catch {
                 // non-critical
@@ -173,9 +175,11 @@ export default function SecurityReportsScreen() {
                             </View>
                             <View style={[styles.healthDivider, { backgroundColor: theme.divider }]} />
                             <View style={styles.healthItem}>
-                                <Text style={[styles.healthNum, { color: '#22C55E' }]}>✓</Text>
+                                <Text style={[styles.healthNum, { color: reusedCount ? '#F59E0B' : '#22C55E' }]}>
+                                    {reusedCount ?? '—'}
+                                </Text>
                                 <Text style={[styles.healthLabel, { color: theme.placeholder }]}>
-                                    Encrypted
+                                    Reused
                                 </Text>
                             </View>
                         </View>
