@@ -1,9 +1,7 @@
 import axios from 'axios';
 import { supabase } from './supabase';
 
-// const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:5000';
-
-const BASE_URL = 'http://192.168.1.151:5000';
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:5000';
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -30,7 +28,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await supabase.auth.signOut();
+      // Attempt a token refresh before signing out — guards against the race
+      // where a valid session's access token expires mid-flight.
+      const { data: { session } } = await supabase.auth.refreshSession();
+      if (!session) {
+        await supabase.auth.signOut();
+      }
     }
     return Promise.reject(error);
   }

@@ -202,6 +202,7 @@ class VaultEntry(db.Model):
             "username": self.username,
             "url": self.url,
             "notes": self.notes,
+            "password_strength": self.password_strength,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "tags": [t.tag_name for t in self.tags] if self.tags else [],

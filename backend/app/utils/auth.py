@@ -1,8 +1,11 @@
+import logging
 import os
 from functools import wraps
 import jwt
 from jwt import PyJWKClient
 from flask import g, jsonify, request
+
+logger = logging.getLogger(__name__)
 
 # ── JWKS client (cached) ──────────────────────────────────────────
 _jwks_client: PyJWKClient | None = None
@@ -94,8 +97,9 @@ def require_auth(fn):
                 }
             }), 401
         except Exception as exc:
-            # Log the exact reason for debugging (remove the print in production)
-            print(f"[AUTH ERROR] {type(exc).__name__}: {exc}", flush=True)
+            # Log only the exception type — never the message, which may contain
+            # token fragments or other sensitive data.
+            logger.debug("Auth token validation failed: %s", type(exc).__name__)
             return jsonify({
                 "error": {
                     "code": "401",

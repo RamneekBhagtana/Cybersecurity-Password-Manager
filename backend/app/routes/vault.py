@@ -1,6 +1,7 @@
 #Task 15 — Password Vault CRUD API
 
 import hashlib
+import hmac as _hmac
 import os
 import re
 from flask import Blueprint, request, jsonify, g
@@ -55,6 +56,21 @@ def _compute_strength(password: str) -> int:
 
 
 # Internal helpers
+
+def _hash_for_reuse(password: str, encryption_key: bytes) -> str:
+    """HMAC-SHA256 of the password keyed with the per-user encryption key.
+
+    Using the encryption key (derived from master_password + per-user salt via
+    Argon2id) as the HMAC key means:
+      - The digest is deterministic for the same password + same user, so
+        identical passwords always produce the same value and reuse detection
+        works across entries.
+      - It is keyed with a secret, satisfying the requirement to not apply a
+        plain SHA-256 to sensitive data.
+      - Cross-user comparison is impossible since every user's key is unique.
+    """
+    return _hmac.new(encryption_key, password.encode("utf-8"), "sha256").hexdigest()
+
 
 def _derive_key_from_request(data: dict):
     master_password = data.get("master_password", "").strip()
@@ -224,15 +240,6 @@ def create_vault_entry():
 
     ciphertext, iv, auth_tag = encrypt(password, key)
 
-    pbkdf2_iterations = 310000
-    pbkdf2_salt = os.urandom(16)
-    pbkdf2_hash = hashlib.pbkdf2_hmac(
-        "sha256",
-        password.encode("utf-8"),
-        pbkdf2_salt,
-        pbkdf2_iterations,
-    )
-
     entry = VaultEntry(
         user_id=g.user_id,
         title=title,
@@ -243,7 +250,7 @@ def create_vault_entry():
         iv=iv,
         auth_tag=auth_tag,
         password_strength=_compute_strength(password),
-        password_hash=f"pbkdf2_sha256${pbkdf2_iterations}${pbkdf2_salt.hex()}${pbkdf2_hash.hex()}",
+        password_hash=_hash_for_reuse(password, key),
     )
     db.session.add(entry)
     db.session.flush()
@@ -338,10 +345,7 @@ def update_vault_entry(entry_id):
         entry.iv = iv
         entry.auth_tag = auth_tag
         entry.password_strength = _compute_strength(new_password)
-        salt = os.urandom(16)
-        iterations = 310000
-        password_hash = hashlib.pbkdf2_hmac("sha256", new_password.encode("utf-8"), salt, iterations)
-        entry.password_hash = f"pbkdf2_sha256${iterations}${salt.hex()}${password_hash.hex()}"
+        entry.password_hash = _hash_for_reuse(new_password, key)
 
     if "tags" in data:
         entry.tags = _resolve_tags(data["tags"], g.user_id)
@@ -372,7 +376,7 @@ def recompute_strengths():
         try:
             plaintext = decrypt(entry.encrypted_password, entry.iv, entry.auth_tag, key)
             entry.password_strength = _compute_strength(plaintext)
-            entry.password_hash = hashlib.sha256(plaintext.encode()).hexdigest()
+            entry.password_hash = _hash_for_reuse(plaintext, key)
             updated += 1
         except DecryptionError:
             failed += 1
