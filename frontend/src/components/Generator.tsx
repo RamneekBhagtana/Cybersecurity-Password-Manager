@@ -30,21 +30,53 @@ export default function Generator({ onSelect }: GeneratorProps) {
   });
 
   const handleGenerate = async () => {
-    setLoading(true);
-    try {
-      const settings = mode === "password" ? passSettings : phraseSettings;
-      const secret = await fetchGeneratedSecret(mode, settings);
-      setResult(secret);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to generate secret. Is the backend running?");
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+
+  try {
+    const endpoint =
+      mode === "password"
+        ? "http://localhost:5000/generator/password"
+        : "http://localhost:5000/generator/passphrase";
+
+    const body =
+      mode === "password"
+        ? {
+            length: passSettings.length,
+            include_uppercase: passSettings.uppercase,
+            include_lowercase: passSettings.lowercase,
+            include_numbers: passSettings.numbers,
+            include_special: passSettings.symbols, // ✅ FIX HERE
+            min_numbers: passSettings.min_numbers,
+            min_special: passSettings.min_special,
+          }
+        : {
+            words: phraseSettings.word_count,
+            separator: phraseSettings.separator,
+            capitalize: phraseSettings.capitalize,
+            include_number: phraseSettings.include_number,
+          };
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+
+    setResult(data.password || data.passphrase);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to generate secret.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white rounded-2xl shadow-sm border border-gray-100">
+    <div className="w-full p-6 bg-white rounded-2xl shadow-sm border border-gray-100">
       {/* 1. Mode Toggle */}
       <div className="flex p-1 bg-gray-100 rounded-xl mb-6">
         <button

@@ -63,10 +63,12 @@ export default function AppLayout({ children }: Props) {
 
         {/* CONTENT */}
         <main className="space-y-6">
-          {children}
+          {children} 
         </main>
 
       </div>
     </div>
   );
 }
+
+
