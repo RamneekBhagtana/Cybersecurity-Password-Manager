@@ -224,6 +224,15 @@ def create_vault_entry():
 
     ciphertext, iv, auth_tag = encrypt(password, key)
 
+    pbkdf2_iterations = 310000
+    pbkdf2_salt = os.urandom(16)
+    pbkdf2_hash = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        pbkdf2_salt,
+        pbkdf2_iterations,
+    )
+
     entry = VaultEntry(
         user_id=g.user_id,
         title=title,
@@ -234,7 +243,7 @@ def create_vault_entry():
         iv=iv,
         auth_tag=auth_tag,
         password_strength=_compute_strength(password),
-        password_hash=hashlib.sha256(password.encode()).hexdigest(),
+        password_hash=f"pbkdf2_sha256${pbkdf2_iterations}${pbkdf2_salt.hex()}${pbkdf2_hash.hex()}",
     )
     db.session.add(entry)
     db.session.flush()
