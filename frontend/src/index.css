@@ -29,3 +29,22 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* DARK MODE VARIABLES */
+.dark {
+  --bg: #0b1220;
+
+  --surface: #111827;     /* THIS is what fixes your cards */
+  --surface-2: #1f2937;
+
+  --text: #f9fafb;
+  --muted: #9ca3af;
+
+  --primary: #8b85ff;
+  --primary-dark: #6c63ff;
+
+  --success: #22c55e;
+  --danger: #ef4444;
+
+  --border: #1f2937;
+}

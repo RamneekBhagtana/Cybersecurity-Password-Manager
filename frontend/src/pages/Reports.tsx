@@ -1,30 +1,36 @@
-import { useNavigate } from "react-router-dom";
+import { useMemo } from "react";
 import AppLayout from "../layouts/AppLayout";
 import { useVaultEntries } from "../hooks/useVaultEntries";
 
 export default function Reports() {
-  const navigate = useNavigate();
-  const { entries } = useVaultEntries();
+  const { entries = [], loading } = useVaultEntries();
 
-  // 🔹 Detect reused passwords
-  const passwordMap: Record<string, any[]> = {};
+  // reused passwords
+  const reused = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    entries.forEach((e) => {
+      if (!map[e.password]) map[e.password] = [];
+      map[e.password].push(e);
+    });
 
-  entries.forEach((entry) => {
-    if (!passwordMap[entry.password]) {
-      passwordMap[entry.password] = [];
-    }
-    passwordMap[entry.password].push(entry);
-  });
+    return Object.values(map)
+      .filter((group) => group.length > 1)
+      .map((group) => ({
+        count: group.length,
+        entries: group,
+      }));
+  }, [entries]);
 
-  const reused = Object.values(passwordMap)
-    .filter((group) => group.length > 1)
-    .map((group) => ({
-      count: group.length,
-      entries: group,
-    }));
+  // weak passwords
+  const weak = useMemo(() => {
+    return entries.filter((e) => e.password.length < 8);
+  }, [entries]);
 
-  // 🔹 Detect weak passwords (simple rule for now)
-  const weak = entries.filter((entry) => entry.password.length < 8);
+  // health score
+  const healthScore = Math.max(
+    0,
+    100 - weak.length * 10 - reused.length * 10
+  );
 
   return (
     <AppLayout>
@@ -38,8 +44,15 @@ export default function Reports() {
           </p>
         </div>
 
+        {/* LOADING */}
+        {loading && (
+          <p className="text-sm text-[var(--muted)]">
+            Loading reports...
+          </p>
+        )}
+
         {/* VAULT HEALTH */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4">
+        <div className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-6 shadow-md">
           <h2 className="text-lg font-semibold">Vault Health</h2>
 
           <div className="flex justify-between text-center">
@@ -54,10 +67,10 @@ export default function Reports() {
 
             <div className="flex-1">
               <p className="text-2xl font-bold text-green-500">
-                ✓
+                {healthScore}%
               </p>
               <p className="text-xs text-[var(--muted)]">
-                Encrypted
+                Health score
               </p>
             </div>
 
@@ -78,20 +91,21 @@ export default function Reports() {
         </div>
 
         {/* WEAK PASSWORDS */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+        <div className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-6 shadow-md">
           <h2 className="text-lg font-semibold">Weak Passwords</h2>
 
           {weak.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">All good 🎉</p>
+            <p className="text-sm text-[var(--muted)]">
+              All clear!
+            </p>
           ) : (
             weak.map((item) => (
               <div
                 key={item.id}
-                onClick={() => navigate(`/edit/${item.id}`)}
-                className="flex justify-between items-center p-3 rounded-xl bg-[var(--surface-2)] cursor-pointer hover:opacity-80"
+                className="flex justify-between items-center p-3 rounded-xl bg-[var(--surface-2)]"
               >
                 <div>
-                  <p className="font-medium">{item.site}</p>
+                  <p className="font-medium">{item.siteName}</p>
                   <p className="text-xs text-[var(--muted)]">
                     {item.username}
                   </p>
@@ -106,12 +120,12 @@ export default function Reports() {
         </div>
 
         {/* REUSED PASSWORDS */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+        <div className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-6 shadow-md">
           <h2 className="text-lg font-semibold">Reused Passwords</h2>
 
           {reused.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">
-              No reused passwords 🎉
+              All clear!
             </p>
           ) : (
             reused.map((group, index) => (
@@ -124,12 +138,8 @@ export default function Reports() {
                 </p>
 
                 {group.entries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    onClick={() => navigate(`/edit/${entry.id}`)}
-                    className="text-sm cursor-pointer hover:underline"
-                  >
-                    {entry.site} ({entry.username})
+                  <div key={entry.id} className="text-sm">
+                    {entry.siteName} ({entry.username})
                   </div>
                 ))}
               </div>
@@ -137,13 +147,17 @@ export default function Reports() {
           )}
         </div>
 
-        {/* BREACHES (STATIC FOR NOW) */}
+        {/* BREACHES */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">
             Recent Data Breaches
           </h2>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <p className="text-xs text-[var(--muted)]">
+            Static demo data
+          </p>
+
+          <div className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-6 shadow-md">
             <div className="flex justify-between">
               <p className="font-semibold">
                 National Public Data
@@ -154,11 +168,7 @@ export default function Reports() {
             </div>
 
             <p className="text-xs text-[var(--muted)] mt-1">
-              Aug 2024 • 2.9 billion records
-            </p>
-
-            <p className="text-sm mt-2">
-              Social Security numbers, names, and addresses leaked.
+              Aug 2024 • 2.9B records
             </p>
           </div>
         </div>

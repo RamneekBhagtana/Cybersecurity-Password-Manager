@@ -13,12 +13,11 @@ export default function Register() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
 
-  const handleRegister = async (e:any) => {
+  const handleRegister = async (e: any) => {
     e.preventDefault();
 
     if (password !== confirm) {
-      setError("Passwords do not match");
-      return;
+      return setError("Passwords do not match");
     }
 
     const { error } = await supabase.auth.signUp({
@@ -26,17 +25,18 @@ export default function Register() {
       password,
     });
 
-    if (error) {
-      setError(error.message);
-      return;
-    }
+    if (error) return setError(error.message);
 
     navigate("/dashboard");
   };
 
   return (
     <AuthLayout>
-      <h1 className="text-2xl font-bold mb-6">Register</h1>
+      <h1 className="text-2xl font-bold mb-2">Register</h1>
+
+      <p className="mb-6 text-sm text-[var(--muted)]">
+        Create your secure vault account.
+      </p>
 
       <form onSubmit={handleRegister} className="space-y-4">
         <Input label="Email" value={email} onChange={(e:any)=>setEmail(e.target.value)} />
@@ -48,9 +48,9 @@ export default function Register() {
         <Button className="w-full">Create account</Button>
       </form>
 
-      <p className="mt-4 text-sm text-center">
+      <p className="mt-4 text-center text-sm">
         Already have an account?{" "}
-        <Link to="/login" className="text-[var(--primary)]">
+        <Link to="/login" className="text-[var(--primary)] font-semibold">
           Login
         </Link>
       </p>

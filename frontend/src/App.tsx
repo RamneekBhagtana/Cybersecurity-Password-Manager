@@ -1,20 +1,19 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import GeneratorPage from './pages/GeneratorPage';
-import ProtectedRoute from './components/ProtectedRoute';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute";
 
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Vault from './pages/Vault';
-import Generator from './pages/Generator';
-import Reports from './pages/Reports';
-import Profile from './pages/Profile';
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import Vault from "./pages/Vault";
+import Generator from "./components/Generator";
+import Reports from "./pages/Reports";
+import Profile from "./pages/Profile";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Default route */}
+        {/* Redirect root → login */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
         {/* Public routes */}

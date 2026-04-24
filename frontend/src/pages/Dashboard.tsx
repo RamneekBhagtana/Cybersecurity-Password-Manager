@@ -26,13 +26,12 @@ export default function Dashboard() {
   ];
 
   const toggleTag = (tag: string) => {
-    if (tag === "All") {
-      setSelectedTags([]);
-      return;
-    }
+    if (tag === "All") return setSelectedTags([]);
 
     setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]
+      prev.includes(tag)
+        ? prev.filter((item) => item !== tag)
+        : [...prev, tag]
     );
   };
 
@@ -41,47 +40,56 @@ export default function Dashboard() {
     setSelectedTags([]);
   };
 
-  const hasActiveFilters = searchTerm.trim().length > 0 || selectedTags.length > 0;
   const noMatches =
     !loading && !error && filteredEntries.length === 0 && entries.length > 0;
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="rounded-[32px] bg-gradient-to-br from-[#120f2f] via-[#25154d] to-[#0d1022] p-6 text-white shadow-xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-white/60">
+
+        {/* HEADER */}
+        <Card>
+          <p className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
             Overview
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Dashboard</h1>
-          <p className="mt-2 max-w-2xl text-sm text-white/75">
-            Track your vault activity, search credentials quickly, and jump into your recent entries.
+          <h1 className="mt-2 text-3xl font-bold text-[var(--text)]">
+            Dashboard
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
+            Track your vault activity, search credentials quickly, and manage your saved entries.
           </p>
-        </div>
+        </Card>
 
-        {loading ? (
+        {/* LOADING / ERROR */}
+        {loading && (
           <Card>Loading vault...</Card>
-        ) : error ? (
-          <Card className="space-y-3">
+        )}
+
+        {error && (
+          <Card>
             <p className="text-sm font-medium text-[var(--danger)]">{error}</p>
             <button
-              type="button"
               onClick={reload}
-              className="text-sm font-semibold text-[var(--primary)] hover:underline"
+              className="mt-2 text-sm font-semibold text-[var(--primary)] hover:underline"
             >
               Try again
             </button>
           </Card>
-        ) : null}
+        )}
 
+        {/* STATS */}
         <div className="grid gap-4 md:grid-cols-3">
           {stats.map((item) => (
             <Card key={item.label}>
               <p className="text-sm text-[var(--muted)]">{item.label}</p>
-              <p className="mt-2 text-3xl font-bold">{item.value}</p>
+              <p className="mt-2 text-3xl font-bold text-[var(--text)]">
+                {item.value}
+              </p>
             </Card>
           ))}
         </div>
 
+        {/* FILTERS */}
         <VaultFilters
           searchTerm={searchTerm}
           onSearchTermChange={setSearchTerm}
@@ -93,12 +101,17 @@ export default function Dashboard() {
           totalCount={entries.length}
         />
 
+        {/* MAIN GRID */}
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-          <Card className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
+
+          {/* VAULT */}
+          <Card>
+            <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold">Vault entries</h2>
-                <p className="mt-1 text-sm text-[var(--muted)]">
+                <h2 className="text-xl font-bold text-[var(--text)]">
+                  Vault entries
+                </h2>
+                <p className="text-sm text-[var(--muted)]">
                   Your saved passwords at a glance.
                 </p>
               </div>
@@ -111,20 +124,20 @@ export default function Dashboard() {
               </Link>
             </div>
 
-            <div className="space-y-3">
+            <div className="mt-4 space-y-3">
               {noMatches ? (
-                <div className="rounded-[24px] bg-[var(--surface-2)] p-4">
-                  <p className="text-sm font-medium text-[var(--text)]">
+                <div className="rounded-xl bg-[var(--surface-2)] p-4">
+                  <p className="text-sm text-[var(--text)]">
                     No passwords match your filters.
                   </p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    Clear the search or tag filters to see more results.
+                  <p className="text-sm text-[var(--muted)]">
+                    Try clearing filters.
                   </p>
                 </div>
               ) : filteredEntries.length === 0 ? (
-                <p className="rounded-[24px] bg-[var(--surface-2)] p-4 text-sm text-[var(--muted)]">
+                <div className="rounded-xl bg-[var(--surface-2)] p-4 text-sm text-[var(--muted)]">
                   No passwords saved yet.
-                </p>
+                </div>
               ) : (
                 filteredEntries.slice(0, 2).map((entry) => (
                   <VaultEntryCard
@@ -136,65 +149,54 @@ export default function Dashboard() {
                 ))
               )}
             </div>
-
-            {hasActiveFilters && filteredEntries.length > 2 ? (
-              <p className="text-sm text-[var(--muted)]">
-                Showing the first 2 filtered entries here. Open Vault to see the full list.
-              </p>
-            ) : null}
           </Card>
 
-          <Card className="space-y-4">
-            <h2 className="text-xl font-bold">Quick actions</h2>
+          {/* ACTIONS */}
+          <Card>
+            <h2 className="text-xl font-bold text-[var(--text)] mb-3">
+              Quick actions
+            </h2>
 
-            <Link
-              to="/vault"
-              className="block rounded-2xl bg-[var(--surface-2)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-slate-200/70"
-            >
-              Open Vault
-            </Link>
+            <div className="space-y-2">
+              <Link
+                to="/vault"
+                className="block rounded-xl bg-[var(--surface-2)] px-4 py-3 text-sm hover:bg-[var(--surface-3)] transition"
+              >
+                Open Vault
+              </Link>
 
-            <Link
-              to="/generator"
-              className="block rounded-2xl bg-[var(--surface-2)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-slate-200/70"
-            >
-              Generate Password
-            </Link>
+              <Link
+                to="/generator"
+                className="block rounded-xl bg-[var(--surface-2)] px-4 py-3 text-sm hover:bg-[var(--surface-3)] transition"
+              >
+                Generate Password
+              </Link>
 
-            <Link
-              to="/profile"
-              className="block rounded-2xl bg-[var(--surface-2)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-slate-200/70"
-            >
-              Profile Settings
-            </Link>
+              <Link
+                to="/profile"
+                className="block rounded-xl bg-[var(--surface-2)] px-4 py-3 text-sm hover:bg-[var(--surface-3)] transition"
+              >
+                Profile Settings
+              </Link>
+            </div>
           </Card>
         </div>
 
-        <Card className="space-y-3">
-          <h2 className="text-xl font-bold">Security status</h2>
-          <div className="rounded-[24px] bg-[rgba(108,99,255,0.08)] p-4">
+        {/* SECURITY */}
+        <Card>
+          <h2 className="text-xl font-bold text-[var(--text)]">
+            Security status
+          </h2>
+
+          <div className="mt-4 rounded-xl bg-[var(--surface-2)] p-4">
             <p className="text-sm text-[var(--muted)]">Overall score</p>
-            <p className="mt-1 text-4xl font-bold text-[var(--primary)]">92%</p>
-            <p className="mt-2 text-sm text-[var(--text)]">
-              Your vault is in good shape. Keep using strong passwords and review weak ones later.
+            <p className="text-4xl font-bold text-[var(--primary)]">92%</p>
+            <p className="text-sm text-[var(--muted)] mt-2">
+              Your vault is in good shape.
             </p>
           </div>
-
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center justify-between">
-              <span>Weak passwords</span>
-              <span className="font-semibold text-[var(--danger)]">2</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>2FA enabled</span>
-              <span className="font-semibold text-[var(--success)]">Yes</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Vault synced</span>
-              <span className="font-semibold text-[var(--success)]">Yes</span>
-            </div>
-          </div>
         </Card>
+
       </div>
     </AppLayout>
   );

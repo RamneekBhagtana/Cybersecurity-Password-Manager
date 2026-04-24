@@ -22,10 +22,10 @@ export default function AppLayout({ children }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] transition-colors">
+
       {/* HEADER */}
-      <header className="border-b border-[var(--border)] bg-white">
+      <header className="border-b border-[var(--border)] bg-[var(--bg)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
           <Link to="/dashboard" className="text-lg font-bold">
             SecureVault
@@ -38,10 +38,10 @@ export default function AppLayout({ children }: Props) {
       </header>
 
       {/* MAIN LAYOUT */}
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 py-6 md:grid-cols-[200px_1fr]">
-        
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 py-6 md:grid-cols-[220px_1fr]">
+
         {/* SIDEBAR */}
-        <aside className="rounded-[28px] bg-white p-4 shadow-md">
+        <aside className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-4 shadow-md transition-colors">
           <nav className="space-y-2">
             <NavLink to="/dashboard" className={navLinkClass}>
               Dashboard

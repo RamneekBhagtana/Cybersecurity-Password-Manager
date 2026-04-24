@@ -1,10 +1,24 @@
-type CardProps = React.HTMLAttributes<HTMLDivElement>;
+import type { ReactNode } from "react";
 
-export default function Card({ className = "", ...props }: CardProps) {
+type CardProps = {
+  children: ReactNode;
+  className?: string;
+};
+
+export default function Card({ children, className = "" }: CardProps) {
   return (
     <div
-      className={`rounded-[28px] bg-white p-5 shadow-md shadow-slate-200/60 ${className}`}
-      {...props}
-    />
+      className={`
+        rounded-[24px]
+        bg-[var(--surface)]
+        border border-[var(--border)]
+        p-5
+        shadow-sm
+        dark:shadow-none
+        ${className}
+      `}
+    >
+      {children}
+    </div>
   );
 }
