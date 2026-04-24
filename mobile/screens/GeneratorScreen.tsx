@@ -53,6 +53,14 @@ function getStrengthInfo(password: string): { label: string; color: string; scor
     return { label: 'Very Strong — centuries to crack', color: '#22C55E', score: 4 };
 }
 
+// Passphrase strength is determined solely by word count (2–5)
+function getPassphraseStrength(words: number): { label: string; color: string; score: number } {
+    if (words <= 2) return { label: 'Weak',   color: '#EF4444', score: 1 };
+    if (words === 3) return { label: 'Fair',   color: '#F59E0B', score: 2 };
+    if (words === 4) return { label: 'Good',   color: '#84CC16', score: 3 };
+    return              { label: 'Strong',  color: '#22C55E', score: 4 };
+}
+
 // ── Passphrase quick-select separators ────────────────────────────
 const QUICK_SEPS = ['-', '_', '.', '!', '@', '#', '*'];
 
@@ -70,6 +78,7 @@ export default function GeneratorScreen() {
     const [special, setSpecial] = useState(true);
     const [separator, setSeparator] = useState('-');
     const [customSep, setCustomSep] = useState('');
+    const [wordCount, setWordCount] = useState(4);
     const [password, setPassword] = useState('');
     const [generating, setGenerating] = useState(false);
 
@@ -107,7 +116,7 @@ export default function GeneratorScreen() {
             } else {
                 const sep = customSep.trim() || separator;
                 const res = await apiClient.post('/generator/passphrase', {
-                    words: 4,
+                    words: wordCount,
                     separator: sep,
                     capitalize: false,
                 });
@@ -121,7 +130,7 @@ export default function GeneratorScreen() {
         } finally {
             setGenerating(false);
         }
-    }, [length, upper, lower, numbers, special, mode, separator, customSep]);
+    }, [length, upper, lower, numbers, special, mode, separator, customSep, wordCount]);
 
     // Generate on mount and when mode changes
     useEffect(() => {
@@ -140,11 +149,16 @@ export default function GeneratorScreen() {
     const adjustLength = (delta: number) =>
         setLength(l => Math.min(32, Math.max(8, l + delta)));
 
-    const strength = getStrengthInfo(password);
+    const adjustWordCount = (delta: number) =>
+        setWordCount(n => Math.min(5, Math.max(2, n + delta)));
+
+    const strength = mode === 'passphrase'
+        ? getPassphraseStrength(wordCount)
+        : getStrengthInfo(password);
 
     // ── Render ────────────────────────────────────────────────
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: BG }}>
             <ScrollView
                 contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
                 showsVerticalScrollIndicator={false}
@@ -288,6 +302,37 @@ export default function GeneratorScreen() {
                 {/* ── Passphrase options ───────────────────────────── */}
                 {mode === 'passphrase' && (
                     <>
+                        {/* Word count stepper */}
+                        <View style={[styles.settingCard, { backgroundColor: theme.card }]}>
+                            <View style={styles.lengthRow}>
+                                <Text style={[styles.settingLabel, { color: theme.text }]}>
+                                    Words
+                                </Text>
+                                <View style={styles.lengthControls}>
+                                    <TouchableOpacity
+                                        style={[styles.lengthBtn, { backgroundColor: BG }]}
+                                        onPress={() => adjustWordCount(-1)}
+                                        disabled={wordCount <= 2}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={[styles.lengthBtnText, { color: wordCount <= 2 ? theme.placeholder : theme.text }]}>−</Text>
+                                    </TouchableOpacity>
+                                    <Text style={[styles.lengthValue, { color: theme.text }]}>{wordCount}</Text>
+                                    <TouchableOpacity
+                                        style={[styles.lengthBtn, { backgroundColor: BG }]}
+                                        onPress={() => adjustWordCount(1)}
+                                        disabled={wordCount >= 5}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={[styles.lengthBtnText, { color: wordCount >= 5 ? theme.placeholder : theme.text }]}>+</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                            <Text style={[styles.settingSubLabel, { color: theme.placeholder, marginTop: 4 }]}>
+                                Range: 2 – 5 words
+                            </Text>
+                        </View>
+
                         {/* Separator picker */}
                         <View style={[styles.settingCard, { backgroundColor: theme.card }]}>
                             {/* Header row: label + live preview */}

@@ -1,7 +1,11 @@
 #Task 15 — Password Vault CRUD API
 
+import hashlib
+import hmac as _hmac
 import os
+import re
 from flask import Blueprint, request, jsonify, g
+from sqlalchemy import text
 from app.extensions import db
 from app.models.vault_entry import VaultEntry
 from app.models.tag import Tag
@@ -12,7 +16,62 @@ from app.utils.auth import require_auth
 vault_bp = Blueprint("vault", __name__, url_prefix="/vault")
 
 
+def _compute_strength(password: str) -> int:
+    """
+    Return 1 (Weak) – 4 (Strong).
+
+    Passphrases (alphabetic words joined by a common separator) are scored
+    by word count:  2=Weak  3=Fair  4=Good  5+=Strong
+
+    Regular passwords are scored by character-complexity criteria:
+      • ≥ 16 characters
+      • at least one uppercase letter
+      • at least one digit
+      • at least one special character
+    """
+    # Passphrase detection — split on a single repeated separator character
+    for sep in ('-', '_', '.', ' ', '|'):
+        parts = password.split(sep)
+        if len(parts) >= 2 and all(p.isalpha() and len(p) >= 2 for p in parts):
+            word_count = len(parts)
+            if word_count <= 2:
+                return 1  # Weak
+            if word_count == 3:
+                return 2  # Fair
+            if word_count == 4:
+                return 3  # Good
+            return 4      # Strong (5+ words)
+
+    # Regular password scoring
+    score = 0
+    if len(password) >= 16:
+        score += 1
+    if re.search(r'[A-Z]', password):
+        score += 1
+    if re.search(r'[0-9]', password):
+        score += 1
+    if re.search(r'[^A-Za-z0-9]', password):
+        score += 1
+    return max(1, score)
+
+
 # Internal helpers
+
+def _hash_for_reuse(password: str, encryption_key: bytes) -> str:
+    """PBKDF2-HMAC-SHA256 fingerprint of the password with per-user key material.
+
+    Using the encryption key (derived from master_password + per-user salt via
+    Argon2id) as the PBKDF2 salt/context means:
+      - The digest is deterministic for the same password + same user, so
+        identical passwords always produce the same value and reuse detection
+        works across entries.
+      - The computation is intentionally expensive (unlike plain SHA-256/HMAC),
+        making it more appropriate for password-derived sensitive data.
+      - Cross-user comparison is impossible since every user's key is unique.
+    """
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), encryption_key, 310000)
+    return dk.hex()
+
 
 def _derive_key_from_request(data: dict):
     master_password = data.get("master_password", "").strip()
@@ -59,13 +118,15 @@ def _resolve_tags(tag_names: list, user_id) -> list:
     return tags
 
 
-def _serialize_summary(entry: VaultEntry) -> dict:
+def _serialize_summary(entry: VaultEntry, is_reused: bool = False) -> dict:
     return {
         "entry_id": str(entry.entry_id),
         "title": entry.title,
         "username": entry.username,
         "url": entry.url,
         "tags": [t.tag_name for t in entry.tags],
+        "password_strength": entry.password_strength,
+        "is_reused": is_reused,
         "created_at": entry.created_at.isoformat() if entry.created_at else None,
         "updated_at": entry.updated_at.isoformat() if entry.updated_at else None,
     }
@@ -104,14 +165,50 @@ def _serialize_detail(entry: VaultEntry, key: bytes) -> tuple:
 @vault_bp.route("", methods=["GET"])
 @require_auth
 def get_vault():
-    """Returns all vault entries for the authenticated user. No passwords included."""
+    """Returns all vault entries for the authenticated user. No passwords included.
+    Also returns reused_count — number of entries whose password hash appears
+    more than once (requires password_hash to have been populated at save time).
+    """
     entries = (
         VaultEntry.query
         .filter_by(user_id=g.user_id)
         .order_by(VaultEntry.title)
         .all()
     )
-    return jsonify({"entries": [_serialize_summary(e) for e in entries]}), 200
+
+    # Find all entry_ids whose password_hash is shared with at least one other
+    # entry for this user.  A single query returns both the set (for per-entry
+    # is_reused flag) and the count.  Wrapped in try/except so the endpoint
+    # keeps working before the migration adding password_hash has been applied.
+    try:
+        rows = db.session.execute(
+            text("""
+                SELECT e1.entry_id::text
+                FROM vault_entries e1
+                WHERE e1.user_id = :uid
+                  AND e1.password_hash IS NOT NULL
+                  AND EXISTS (
+                      SELECT 1 FROM vault_entries e2
+                      WHERE e2.user_id     = :uid
+                        AND e2.password_hash = e1.password_hash
+                        AND e2.entry_id    != e1.entry_id
+                  )
+            """),
+            {"uid": str(g.user_id)},
+        )
+        reused_ids = {row[0] for row in rows}
+    except Exception:
+        reused_ids = set()
+
+    reused_count = len(reused_ids)
+
+    return jsonify({
+        "entries": [
+            _serialize_summary(e, is_reused=str(e.entry_id) in reused_ids)
+            for e in entries
+        ],
+        "reused_count": reused_count,
+    }), 200
 
 
 # POST /vault — create a new entry
@@ -153,6 +250,8 @@ def create_vault_entry():
         encrypted_password=ciphertext,
         iv=iv,
         auth_tag=auth_tag,
+        password_strength=_compute_strength(password),
+        password_hash=_hash_for_reuse(password, key),
     )
     db.session.add(entry)
     db.session.flush()
@@ -206,8 +305,7 @@ def get_vault_entry(entry_id):
 def update_vault_entry(entry_id):
     """
     Updates an existing vault entry. Only the owning user may update.
-    All fields optional except master_password.
-    If password is provided it is re-encrypted with the derived key.
+    master_password is only required when a new password is provided.
     """
     entry = VaultEntry.query.filter_by(entry_id=entry_id, user_id=g.user_id).first()
     if entry is None:
@@ -217,9 +315,12 @@ def update_vault_entry(entry_id):
     if not data:
         return jsonify({"error": {"code": "400", "message": "Request body must be JSON.", "details": {}}}), 400
 
-    key, err = _derive_key_from_request(data)
-    if err:
-        return err
+    # Only derive the encryption key when the password is actually being changed.
+    key = None
+    if "password" in data:
+        key, err = _derive_key_from_request(data)
+        if err:
+            return err
 
     if "title" in data:
         title = data["title"].strip()
@@ -244,12 +345,45 @@ def update_vault_entry(entry_id):
         entry.encrypted_password = ciphertext
         entry.iv = iv
         entry.auth_tag = auth_tag
+        entry.password_strength = _compute_strength(new_password)
+        entry.password_hash = _hash_for_reuse(new_password, key)
 
     if "tags" in data:
         entry.tags = _resolve_tags(data["tags"], g.user_id)
 
     db.session.commit()
     return jsonify({"updated": True}), 200
+
+
+# POST /vault/recompute-strengths — decrypt all entries and score password strength
+
+@vault_bp.route("/recompute-strengths", methods=["POST"])
+@require_auth
+def recompute_strengths():
+    """
+    Decrypts every vault entry for the authenticated user and (re)computes
+    password_strength.  Requires master_password in the JSON body.
+    Returns {updated, failed}.
+    """
+    data = request.get_json(silent=True) or {}
+    key, err = _derive_key_from_request(data)
+    if err:
+        return err
+
+    entries = VaultEntry.query.filter_by(user_id=g.user_id).all()
+    updated = 0
+    failed = 0
+    for entry in entries:
+        try:
+            plaintext = decrypt(entry.encrypted_password, entry.iv, entry.auth_tag, key)
+            entry.password_strength = _compute_strength(plaintext)
+            entry.password_hash = _hash_for_reuse(plaintext, key)
+            updated += 1
+        except DecryptionError:
+            failed += 1
+
+    db.session.commit()
+    return jsonify({"updated": updated, "failed": failed}), 200
 
 
 # DELETE /vault/<entry_id> — delete an entry

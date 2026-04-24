@@ -1,5 +1,5 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -10,7 +10,7 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../hooks/useSession';
@@ -37,7 +37,6 @@ export default function ProfileScreen() {
     const email = session?.user?.email ?? 'user@email.com';
     const initial = email.charAt(0).toUpperCase();
 
-    // Format join date
     const createdAt = session?.user?.created_at
         ? new Date(session.user.created_at).toLocaleDateString('en-US', {
               month: 'short',
@@ -45,50 +44,43 @@ export default function ProfileScreen() {
           })
         : 'Mar 2026';
 
-    // ── Fetch vault stats from backend ────────────────────────
-    useEffect(() => {
-        let cancelled = false;
+    // ── Fetch vault stats — re-runs every time this tab gains focus ───
+    useFocusEffect(
+        useCallback(() => {
+            let cancelled = false;
+            setStatsLoading(true);
+            const fetchStats = async () => {
+                try {
+                    const res = await apiClient.get('/vault');
+                    if (cancelled) return;
+                    const entries: any[] = res.data.entries ?? [];
+                    const weakCount = entries.filter(
+                        (e: any) => e.password_strength === 1
+                    ).length;
+                    setStats({
+                        total: entries.length,
+                        weak: weakCount,
+                        reused: res.data.reused_count ?? 0,
+                    });
+                } catch {
+                    // Non-critical — silently ignore
+                } finally {
+                    if (!cancelled) setStatsLoading(false);
+                }
+            };
+            fetchStats();
+            return () => { cancelled = true; };
+        }, [])
+    );
 
-        const fetchStats = async () => {
-            try {
-                const res = await apiClient.get('/vault');
-                if (cancelled) return;
-
-                const entries: any[] = res.data.entries ?? [];
-
-                // Note: weak/reused detection requires master_password decryption
-                // which happens in the Security Reports feature (Task 19).
-                // For now, we show total count only and leave weak/reused at 0.
-                setStats({
-                    total: entries.length,
-                    weak: 0,
-                    reused: 0,
-                });
-            } catch (err) {
-                // Silently fail - stats are not critical
-                console.warn('Failed to load vault stats:', err);
-            } finally {
-                if (!cancelled) setStatsLoading(false);
-            }
-        };
-
-        fetchStats();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    // ── Sign out with SecureStore cleanup ─────────────────────
-    const handleSignOut = async () => {
+    // ── Sign out ──────────────────────────────────────────────
+    const handleSignOut = () => {
         Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Sign Out',
                 style: 'destructive',
-                onPress: async () => {
-                    // Sign out from Supabase (triggers auth state listener in App.tsx)
-                    await supabase.auth.signOut();
-                },
+                onPress: () => supabase.auth.signOut(),
             },
         ]);
     };
@@ -121,7 +113,7 @@ export default function ProfileScreen() {
 
     // ── Render ────────────────────────────────────────────────
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
             <ScrollView
                 contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
                 showsVerticalScrollIndicator={false}
@@ -147,7 +139,7 @@ export default function ProfileScreen() {
                     {[
                         { label: 'Total', value: stats.total, color: theme.text },
                         { label: 'Weak', value: stats.weak, color: '#EF4444' },
-                        { label: 'Reused', value: stats.reused, color: '#22C55E' },
+                        { label: 'Reused', value: stats.reused, color: stats.reused > 0 ? '#F59E0B' : '#22C55E' },
                     ].map(({ label, value, color }) => (
                         <View key={label} style={[styles.statCard, { backgroundColor: theme.card }]}>
                             {statsLoading ? (

@@ -1,9 +1,35 @@
+import pathlib
 import secrets
 import string
 from flask import Blueprint, request, jsonify
 from app.utils.auth import require_auth
 
 generator_bp = Blueprint("generator", __name__, url_prefix="/generator")
+
+# ── EFF Long Wordlist ─────────────────────────────────────────────
+# Loaded once at import time from eff_long.txt (8,000+ words).
+# Falls back to a small inline list only if the file is missing.
+_WORDLIST_PATH = pathlib.Path(__file__).parent.parent.parent / "eff_long.txt"
+
+def _load_eff_wordlist() -> list[str]:
+    words: list[str] = []
+    with _WORDLIST_PATH.open(encoding="utf-8") as fh:
+        for line in fh:
+            parts = line.strip().split("\t")
+            if len(parts) == 2:
+                words.append(parts[1])
+    return words
+
+try:
+    _WORDS = _load_eff_wordlist()
+except Exception:
+    # Fallback — should not happen in a correctly deployed environment.
+    _WORDS = [
+        "apple", "bridge", "cactus", "dolphin", "eagle", "forest",
+        "guitar", "hammer", "island", "jungle", "kitten", "lemon",
+        "mountain", "noodle", "ocean", "pillow", "quartz", "river",
+        "silver", "tiger", "umbrella", "valley", "window", "yellow",
+    ]
 
 
 @generator_bp.route("/password", methods=["POST"])
@@ -32,19 +58,13 @@ def generate_password():
 @generator_bp.route("/passphrase", methods=["POST"])
 @require_auth
 def generate_passphrase():
-    # Tiny wordlist; full EFF list is 7776 words — Task 17's real impl
-    words = ["apple", "bridge", "cactus", "dolphin", "eagle", "forest",
-             "guitar", "hammer", "island", "jungle", "kitten", "lemon",
-             "mountain", "noodle", "ocean", "pillow", "quartz", "river",
-             "silver", "tiger", "umbrella", "valley", "window", "yellow"]
-
     data = request.get_json() or {}
     count = int(data.get("words", 4))
-    count = max(3, min(10, count))
+    count = max(2, min(5, count))
     separator = data.get("separator", "-")
     capitalize = bool(data.get("capitalize", False))
 
-    chosen = [secrets.choice(words) for _ in range(count)]
+    chosen = [secrets.choice(_WORDS) for _ in range(count)]
     if capitalize:
         chosen = [w.capitalize() for w in chosen]
 
