@@ -58,18 +58,19 @@ def _compute_strength(password: str) -> int:
 # Internal helpers
 
 def _hash_for_reuse(password: str, encryption_key: bytes) -> str:
-    """HMAC-SHA256 of the password keyed with the per-user encryption key.
+    """PBKDF2-HMAC-SHA256 fingerprint of the password with per-user key material.
 
     Using the encryption key (derived from master_password + per-user salt via
-    Argon2id) as the HMAC key means:
+    Argon2id) as the PBKDF2 salt/context means:
       - The digest is deterministic for the same password + same user, so
         identical passwords always produce the same value and reuse detection
         works across entries.
-      - It is keyed with a secret, satisfying the requirement to not apply a
-        plain SHA-256 to sensitive data.
+      - The computation is intentionally expensive (unlike plain SHA-256/HMAC),
+        making it more appropriate for password-derived sensitive data.
       - Cross-user comparison is impossible since every user's key is unique.
     """
-    return _hmac.new(encryption_key, password.encode("utf-8"), "sha256").hexdigest()
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), encryption_key, 310000)
+    return dk.hex()
 
 
 def _derive_key_from_request(data: dict):
