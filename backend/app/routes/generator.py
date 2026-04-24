@@ -1,6 +1,5 @@
 import secrets
 import string
-import random
 from flask import Blueprint, request, jsonify
 from app.utils.auth import require_auth
 
@@ -45,7 +44,7 @@ def generate_passphrase():
     separator = data.get("separator", "-")
     capitalize = bool(data.get("capitalize", False))
 
-    chosen = [random.choice(words) for _ in range(count)]
+    chosen = [secrets.choice(words) for _ in range(count)]
     if capitalize:
         chosen = [w.capitalize() for w in chosen]
 
