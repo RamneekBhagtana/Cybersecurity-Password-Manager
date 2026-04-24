@@ -70,6 +70,7 @@ export default function GeneratorScreen() {
     const [special, setSpecial] = useState(true);
     const [separator, setSeparator] = useState('-');
     const [customSep, setCustomSep] = useState('');
+    const [wordCount, setWordCount] = useState(4);
     const [password, setPassword] = useState('');
     const [generating, setGenerating] = useState(false);
 
@@ -107,7 +108,7 @@ export default function GeneratorScreen() {
             } else {
                 const sep = customSep.trim() || separator;
                 const res = await apiClient.post('/generator/passphrase', {
-                    words: 4,
+                    words: wordCount,
                     separator: sep,
                     capitalize: false,
                 });
@@ -121,7 +122,7 @@ export default function GeneratorScreen() {
         } finally {
             setGenerating(false);
         }
-    }, [length, upper, lower, numbers, special, mode, separator, customSep]);
+    }, [length, upper, lower, numbers, special, mode, separator, customSep, wordCount]);
 
     // Generate on mount and when mode changes
     useEffect(() => {
@@ -139,6 +140,9 @@ export default function GeneratorScreen() {
     // ── Length control ────────────────────────────────────────
     const adjustLength = (delta: number) =>
         setLength(l => Math.min(32, Math.max(8, l + delta)));
+
+    const adjustWordCount = (delta: number) =>
+        setWordCount(n => Math.min(5, Math.max(2, n + delta)));
 
     const strength = getStrengthInfo(password);
 
@@ -288,6 +292,37 @@ export default function GeneratorScreen() {
                 {/* ── Passphrase options ───────────────────────────── */}
                 {mode === 'passphrase' && (
                     <>
+                        {/* Word count stepper */}
+                        <View style={[styles.settingCard, { backgroundColor: theme.card }]}>
+                            <View style={styles.lengthRow}>
+                                <Text style={[styles.settingLabel, { color: theme.text }]}>
+                                    Words
+                                </Text>
+                                <View style={styles.lengthControls}>
+                                    <TouchableOpacity
+                                        style={[styles.lengthBtn, { backgroundColor: BG }]}
+                                        onPress={() => adjustWordCount(-1)}
+                                        disabled={wordCount <= 2}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={[styles.lengthBtnText, { color: wordCount <= 2 ? theme.placeholder : theme.text }]}>−</Text>
+                                    </TouchableOpacity>
+                                    <Text style={[styles.lengthValue, { color: theme.text }]}>{wordCount}</Text>
+                                    <TouchableOpacity
+                                        style={[styles.lengthBtn, { backgroundColor: BG }]}
+                                        onPress={() => adjustWordCount(1)}
+                                        disabled={wordCount >= 5}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={[styles.lengthBtnText, { color: wordCount >= 5 ? theme.placeholder : theme.text }]}>+</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                            <Text style={[styles.settingSubLabel, { color: theme.placeholder, marginTop: 4 }]}>
+                                Range: 2 – 5 words
+                            </Text>
+                        </View>
+
                         {/* Separator picker */}
                         <View style={[styles.settingCard, { backgroundColor: theme.card }]}>
                             {/* Header row: label + live preview */}

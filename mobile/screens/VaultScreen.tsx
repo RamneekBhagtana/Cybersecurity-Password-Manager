@@ -780,7 +780,22 @@ export default function VaultScreen() {
     const fetchVault = useCallback(async () => {
         try {
             const res = await apiClient.get('/vault');
-            setEntries(res.data.entries ?? []);
+            const newEntries: VaultEntry[] = res.data.entries ?? [];
+            setEntries(newEntries);
+
+            // Sync any custom tags from entries into categoryOrder so they
+            // appear in the manage modal even when added via the entry form.
+            setCategoryOrder(prev => {
+                const prevSet = new Set(prev);
+                const toAdd: string[] = [];
+                newEntries.forEach(e =>
+                    e.tags.forEach(t => { if (!prevSet.has(t)) toAdd.push(t); })
+                );
+                if (toAdd.length === 0) return prev;
+                const next = [...prev, ...toAdd];
+                AsyncStorage.setItem(CAT_ORDER_KEY, JSON.stringify(next));
+                return next;
+            });
         } catch (err: any) {
             if (err.message?.includes('No active session')) {
                 setLoading(false);
