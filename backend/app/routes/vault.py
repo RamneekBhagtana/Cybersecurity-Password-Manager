@@ -101,7 +101,7 @@ def _resolve_tags(tag_names: list, user_id) -> list:
     return tags
 
 
-def _serialize_summary(entry: VaultEntry) -> dict:
+def _serialize_summary(entry: VaultEntry, is_reused: bool = False) -> dict:
     return {
         "entry_id": str(entry.entry_id),
         "title": entry.title,
@@ -109,6 +109,7 @@ def _serialize_summary(entry: VaultEntry) -> dict:
         "url": entry.url,
         "tags": [t.tag_name for t in entry.tags],
         "password_strength": entry.password_strength,
+        "is_reused": is_reused,
         "created_at": entry.created_at.isoformat() if entry.created_at else None,
         "updated_at": entry.updated_at.isoformat() if entry.updated_at else None,
     }
@@ -158,30 +159,37 @@ def get_vault():
         .all()
     )
 
-    # Count entries whose password_hash matches at least one other entry for
-    # this user.  Wrapped in try/except so the endpoint keeps working even if
-    # the migration adding password_hash hasn't been applied yet.
+    # Find all entry_ids whose password_hash is shared with at least one other
+    # entry for this user.  A single query returns both the set (for per-entry
+    # is_reused flag) and the count.  Wrapped in try/except so the endpoint
+    # keeps working before the migration adding password_hash has been applied.
     try:
-        row = db.session.execute(
+        rows = db.session.execute(
             text("""
-                SELECT COUNT(*) FROM vault_entries e1
+                SELECT e1.entry_id::text
+                FROM vault_entries e1
                 WHERE e1.user_id = :uid
                   AND e1.password_hash IS NOT NULL
                   AND EXISTS (
                       SELECT 1 FROM vault_entries e2
-                      WHERE e2.user_id    = :uid
+                      WHERE e2.user_id     = :uid
                         AND e2.password_hash = e1.password_hash
-                        AND e2.entry_id   != e1.entry_id
+                        AND e2.entry_id    != e1.entry_id
                   )
             """),
             {"uid": str(g.user_id)},
         )
-        reused_count = row.scalar() or 0
+        reused_ids = {row[0] for row in rows}
     except Exception:
-        reused_count = 0
+        reused_ids = set()
+
+    reused_count = len(reused_ids)
 
     return jsonify({
-        "entries": [_serialize_summary(e) for e in entries],
+        "entries": [
+            _serialize_summary(e, is_reused=str(e.entry_id) in reused_ids)
+            for e in entries
+        ],
         "reused_count": reused_count,
     }), 200
 

@@ -57,7 +57,11 @@ export default function ProfileScreen() {
                     const weakCount = entries.filter(
                         (e: any) => e.password_strength === 1
                     ).length;
-                    setStats({ total: entries.length, weak: weakCount, reused: 0 });
+                    setStats({
+                        total: entries.length,
+                        weak: weakCount,
+                        reused: res.data.reused_count ?? 0,
+                    });
                 } catch {
                     // Non-critical — silently ignore
                 } finally {
@@ -135,7 +139,7 @@ export default function ProfileScreen() {
                     {[
                         { label: 'Total', value: stats.total, color: theme.text },
                         { label: 'Weak', value: stats.weak, color: '#EF4444' },
-                        { label: 'Reused', value: stats.reused, color: '#22C55E' },
+                        { label: 'Reused', value: stats.reused, color: stats.reused > 0 ? '#F59E0B' : '#22C55E' },
                     ].map(({ label, value, color }) => (
                         <View key={label} style={[styles.statCard, { backgroundColor: theme.card }]}>
                             {statsLoading ? (

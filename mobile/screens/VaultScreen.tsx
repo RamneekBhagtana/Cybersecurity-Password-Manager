@@ -29,6 +29,7 @@ type VaultEntry = {
     url: string | null;
     tags: string[];
     password_strength: number | null;
+    is_reused: boolean;
     created_at: string | null;
     updated_at: string | null;
 };
@@ -1043,9 +1044,16 @@ export default function VaultScreen() {
                                         {item.username}
                                     </Text>
                                 )}
-                                <Text style={[styles.entryTag, { color: strength.color }]}>
-                                    {strength.label}
-                                </Text>
+                                <View style={styles.entryBadgeRow}>
+                                    <Text style={[styles.entryTag, { color: strength.color }]}>
+                                        {strength.label}
+                                    </Text>
+                                    {item.is_reused && (
+                                        <View style={styles.reusedBadge}>
+                                            <Text style={styles.reusedBadgeText}>Reused</Text>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
                             <Text style={[styles.chevron, { color: theme.border }]}>›</Text>
                         </TouchableOpacity>
@@ -1187,7 +1195,15 @@ const styles = StyleSheet.create({
     entryInfo: { flex: 1 },
     entryTitle: { fontSize: 15, fontWeight: '700' },
     entryUsername: { fontSize: 13, marginTop: 2 },
-    entryTag: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+    entryBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+    entryTag: { fontSize: 12, fontWeight: '600' },
+    reusedBadge: {
+        backgroundColor: '#F59E0B',
+        borderRadius: 4,
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+    },
+    reusedBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
     chevron: { fontSize: 24, fontWeight: '300', marginLeft: 6 },
     fab: {
         position: 'absolute',
