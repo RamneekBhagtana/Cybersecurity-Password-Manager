@@ -338,7 +338,10 @@ def update_vault_entry(entry_id):
         entry.iv = iv
         entry.auth_tag = auth_tag
         entry.password_strength = _compute_strength(new_password)
-        entry.password_hash = hashlib.sha256(new_password.encode()).hexdigest()
+        salt = os.urandom(16)
+        iterations = 310000
+        password_hash = hashlib.pbkdf2_hmac("sha256", new_password.encode("utf-8"), salt, iterations)
+        entry.password_hash = f"pbkdf2_sha256${iterations}${salt.hex()}${password_hash.hex()}"
 
     if "tags" in data:
         entry.tags = _resolve_tags(data["tags"], g.user_id)
