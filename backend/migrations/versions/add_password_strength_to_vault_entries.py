@@ -15,10 +15,10 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        'vault_entries',
-        sa.Column('password_strength', sa.Integer(), nullable=True,
-                  comment='1=Weak 2=Fair 3=Good 4=Strong — computed at save time from plaintext')
+    # IF NOT EXISTS makes this safe whether the column was added manually or not.
+    op.execute(
+        "ALTER TABLE vault_entries ADD COLUMN IF NOT EXISTS "
+        "password_strength INTEGER"
     )
 
 
