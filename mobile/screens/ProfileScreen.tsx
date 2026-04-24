@@ -37,6 +37,7 @@ export default function ProfileScreen() {
     const email = session?.user?.email ?? 'user@email.com';
     const initial = email.charAt(0).toUpperCase();
 
+    // Format join date
     const createdAt = session?.user?.created_at
         ? new Date(session.user.created_at).toLocaleDateString('en-US', {
               month: 'short',
@@ -44,33 +45,50 @@ export default function ProfileScreen() {
           })
         : 'Mar 2026';
 
-    // ── Fetch vault stats ─────────────────────────────────────
+    // ── Fetch vault stats from backend ────────────────────────
     useEffect(() => {
         let cancelled = false;
+
         const fetchStats = async () => {
             try {
                 const res = await apiClient.get('/vault');
                 if (cancelled) return;
+
                 const entries: any[] = res.data.entries ?? [];
-                setStats({ total: entries.length, weak: 0, reused: 0 });
-            } catch {
-                // Non-critical — silently ignore
+
+                // Note: weak/reused detection requires master_password decryption
+                // which happens in the Security Reports feature (Task 19).
+                // For now, we show total count only and leave weak/reused at 0.
+                setStats({
+                    total: entries.length,
+                    weak: 0,
+                    reused: 0,
+                });
+            } catch (err) {
+                // Silently fail - stats are not critical
+                console.warn('Failed to load vault stats:', err);
             } finally {
                 if (!cancelled) setStatsLoading(false);
             }
         };
+
         fetchStats();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
-    // ── Sign out ──────────────────────────────────────────────
-    const handleSignOut = () => {
+    // ── Sign out with SecureStore cleanup ─────────────────────
+    const handleSignOut = async () => {
         Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Sign Out',
                 style: 'destructive',
-                onPress: () => supabase.auth.signOut(),
+                onPress: async () => {
+                    // Sign out from Supabase (triggers auth state listener in App.tsx)
+                    await supabase.auth.signOut();
+                },
             },
         ]);
     };

@@ -448,12 +448,13 @@ export default function VaultScreen() {
         return ['all', ...PRESET_CATEGORIES, ...Array.from(customTags)];
     }, [entries]);
 
-    // ── Fetch vault entries ───────────────────────────────────
+    // ── Fetch vault entries from backend ──────────────────────
     const fetchVault = useCallback(async () => {
         try {
             const res = await apiClient.get('/vault');
             setEntries(res.data.entries ?? []);
         } catch (err: any) {
+            // Skip auth-abort errors silently - user isn't signed in yet
             if (err.message?.includes('No active session')) {
                 setLoading(false);
                 return;
@@ -473,6 +474,7 @@ export default function VaultScreen() {
 
     const onRefresh = () => { setRefreshing(true); fetchVault(); };
 
+    // ── Filter entries by active tag ──────────────────────────
     const filtered =
         activeTag === 'all'
             ? entries
