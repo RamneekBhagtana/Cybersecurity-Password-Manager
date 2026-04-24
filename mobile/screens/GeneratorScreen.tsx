@@ -10,14 +10,12 @@ import {
     Switch,
     Alert,
     ActivityIndicator,
+    TextInput,
 } from 'react-native';
 import apiClient from '../lib/apiClient';
+import { useTheme } from '../lib/ThemeContext';
 
-// ── Constants ─────────────────────────────────────────────────────
-const PURPLE = '#6C63FF';
-const BG = '#F0F2F8';
-
-// ── Local fallback generator (used if backend is unreachable) ─────
+// ── Local fallback generator ──────────────────────────────────────
 function generatePasswordLocal(
     length: number,
     opts: { upper: boolean; lower: boolean; numbers: boolean; special: boolean }
@@ -41,12 +39,8 @@ function generatePasswordLocal(
     return result;
 }
 
-// ── Strength calculator for displayed password ────────────────────
-function getStrengthInfo(password: string): {
-    label: string;
-    color: string;
-    score: number;
-} {
+// ── Strength calculator ───────────────────────────────────────────
+function getStrengthInfo(password: string): { label: string; color: string; score: number } {
     let score = 0;
     if (password.length >= 12) score++;
     if (/[A-Z]/.test(password)) score++;
@@ -59,18 +53,45 @@ function getStrengthInfo(password: string): {
     return { label: 'Very Strong — centuries to crack', color: '#22C55E', score: 4 };
 }
 
+// ── Passphrase quick-select separators ────────────────────────────
+const QUICK_SEPS = ['-', '_', '.', '!', '@', '#', '*'];
+
 // ─────────────────────────────────────────────────────────────────
 export default function GeneratorScreen() {
+    const { theme } = useTheme();
+    const PURPLE = theme.purple;
+    const BG = theme.bg;
+
     const [mode, setMode] = useState<'password' | 'passphrase'>('password');
     const [length, setLength] = useState(16);
     const [upper, setUpper] = useState(true);
     const [lower, setLower] = useState(true);
     const [numbers, setNumbers] = useState(true);
     const [special, setSpecial] = useState(true);
+    const [separator, setSeparator] = useState('-');
+    const [customSep, setCustomSep] = useState('');
     const [password, setPassword] = useState('');
     const [generating, setGenerating] = useState(false);
 
-    // ── Regenerate (via backend, with local fallback) ─────────
+    // ── Guard: prevent disabling the last active character type ───
+    const countActive = () =>
+        [upper, lower, numbers, special].filter(Boolean).length;
+
+    const tryToggle = (
+        setter: (v: boolean) => void,
+        newVal: boolean
+    ) => {
+        if (!newVal && countActive() === 1) {
+            Alert.alert(
+                'Cannot Disable',
+                'At least one character type must remain selected — a password cannot be generated with no characters.'
+            );
+            return;
+        }
+        setter(newVal);
+    };
+
+    // ── Generate (backend with local fallback) ────────────────
     const regenerate = useCallback(async () => {
         setGenerating(true);
         try {
@@ -84,96 +105,87 @@ export default function GeneratorScreen() {
                 });
                 setPassword(res.data.password);
             } else {
+                const sep = customSep.trim() || separator;
                 const res = await apiClient.post('/generator/passphrase', {
                     words: 4,
-                    separator: '-',
+                    separator: sep,
                     capitalize: false,
                 });
                 setPassword(res.data.passphrase);
             }
-        } catch (err) {
-            // Backend unreachable - fall back to local generation
-            console.warn('Backend generator failed, using local fallback');
+        } catch {
+            // Backend unreachable — fall back to local generation
             setPassword(
                 generatePasswordLocal(length, { upper, lower, numbers, special })
             );
         } finally {
             setGenerating(false);
         }
-    }, [length, upper, lower, numbers, special, mode]);
+    }, [length, upper, lower, numbers, special, mode, separator, customSep]);
 
-    // Generate initial password on mount and whenever mode changes
+    // Generate on mount and when mode changes
     useEffect(() => {
         regenerate();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mode]);
 
-    // ── Copy to clipboard ─────────────────────────────────────
+    // ── Copy ──────────────────────────────────────────────────
     const handleCopy = async () => {
         if (!password) return;
         await Clipboard.setStringAsync(password);
         Alert.alert('Copied!', 'Password copied to clipboard.');
     };
 
-    // ── Length adjustment ─────────────────────────────────────
-    const adjustLength = (delta: number) => {
-        const newLen = Math.min(32, Math.max(8, length + delta));
-        setLength(newLen);
-    };
+    // ── Length control ────────────────────────────────────────
+    const adjustLength = (delta: number) =>
+        setLength(l => Math.min(32, Math.max(8, l + delta)));
 
     const strength = getStrengthInfo(password);
 
     // ── Render ────────────────────────────────────────────────
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
             <ScrollView
-                contentContainerStyle={styles.container}
+                contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Header */}
-                <Text style={styles.headerTitle}>Generator</Text>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Generator</Text>
 
-                {/* Mode Toggle */}
-                <View style={styles.modeToggle}>
-                    <TouchableOpacity
-                        style={[styles.modeBtn, mode === 'password' && styles.modeBtnActive]}
-                        onPress={() => setMode('password')}
-                        activeOpacity={0.85}
-                    >
-                        <Text
+                {/* Mode toggle */}
+                <View style={[styles.modeToggle, { backgroundColor: theme.isDark ? '#1a1a2e' : '#E5E7EB' }]}>
+                    {(['password', 'passphrase'] as const).map(m => (
+                        <TouchableOpacity
+                            key={m}
                             style={[
-                                styles.modeBtnText,
-                                mode === 'password' && styles.modeBtnTextActive,
+                                styles.modeBtn,
+                                mode === m && [
+                                    styles.modeBtnActive,
+                                    { backgroundColor: theme.card },
+                                ],
                             ]}
+                            onPress={() => setMode(m)}
+                            activeOpacity={0.85}
                         >
-                            Password
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[
-                            styles.modeBtn,
-                            mode === 'passphrase' && styles.modeBtnActive,
-                        ]}
-                        onPress={() => setMode('passphrase')}
-                        activeOpacity={0.85}
-                    >
-                        <Text
-                            style={[
-                                styles.modeBtnText,
-                                mode === 'passphrase' && styles.modeBtnTextActive,
-                            ]}
-                        >
-                            Passphrase
-                        </Text>
-                    </TouchableOpacity>
+                            <Text
+                                style={[
+                                    styles.modeBtnText,
+                                    { color: theme.placeholder },
+                                    mode === m && { color: PURPLE },
+                                ]}
+                            >
+                                {m.charAt(0).toUpperCase() + m.slice(1)}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
 
-                {/* Generated Password Card */}
-                <View style={styles.passwordCard}>
+                {/* Password card */}
+                <View style={[styles.passwordCard, { backgroundColor: theme.card }]}>
                     {generating ? (
                         <ActivityIndicator color={PURPLE} style={styles.passwordLoader} />
                     ) : (
-                        <Text style={styles.passwordText} selectable>
+                        <Text style={[styles.passwordText, { color: theme.text }]} selectable>
                             {password}
                         </Text>
                     )}
@@ -197,120 +209,174 @@ export default function GeneratorScreen() {
                     {/* Actions */}
                     <View style={styles.cardActions}>
                         <TouchableOpacity
-                            style={styles.copyBtn}
+                            style={[styles.copyBtn, { backgroundColor: BG }]}
                             onPress={handleCopy}
                             disabled={generating || !password}
                             activeOpacity={0.85}
                         >
-                            <Text style={styles.copyBtnText}>Copy</Text>
+                            <Text style={[styles.copyBtnText, { color: theme.text }]}>Copy</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            style={styles.newBtn}
+                            style={[styles.newBtn, { backgroundColor: PURPLE }]}
                             onPress={regenerate}
                             disabled={generating}
                             activeOpacity={0.85}
                         >
                             <Text style={styles.newBtnText}>
-                                {generating ? '...' : 'New'}
+                                {generating ? '…' : 'New'}
                             </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Password Options (hide for passphrase mode) */}
+                {/* ── Password options ─────────────────────────────── */}
                 {mode === 'password' && (
                     <>
                         {/* Length */}
-                        <View style={styles.settingCard}>
+                        <View style={[styles.settingCard, { backgroundColor: theme.card }]}>
                             <View style={styles.lengthRow}>
-                                <Text style={styles.settingLabel}>Length</Text>
+                                <Text style={[styles.settingLabel, { color: theme.text }]}>Length</Text>
                                 <View style={styles.lengthControls}>
                                     <TouchableOpacity
-                                        style={styles.lengthBtn}
+                                        style={[styles.lengthBtn, { backgroundColor: BG }]}
                                         onPress={() => adjustLength(-1)}
                                         activeOpacity={0.7}
                                     >
-                                        <Text style={styles.lengthBtnText}>−</Text>
+                                        <Text style={[styles.lengthBtnText, { color: theme.text }]}>−</Text>
                                     </TouchableOpacity>
-                                    <Text style={styles.lengthValue}>{length}</Text>
+                                    <Text style={[styles.lengthValue, { color: theme.text }]}>{length}</Text>
                                     <TouchableOpacity
-                                        style={styles.lengthBtn}
+                                        style={[styles.lengthBtn, { backgroundColor: BG }]}
                                         onPress={() => adjustLength(1)}
                                         activeOpacity={0.7}
                                     >
-                                        <Text style={styles.lengthBtnText}>+</Text>
+                                        <Text style={[styles.lengthBtnText, { color: theme.text }]}>+</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
                         </View>
 
-                        {/* Character Types */}
-                        <View style={styles.settingCard}>
-                            <View style={styles.switchRow}>
-                                <Text style={styles.settingLabel}>Uppercase (A-Z)</Text>
-                                <Switch
-                                    value={upper}
-                                    onValueChange={setUpper}
-                                    trackColor={{ false: '#D1D5DB', true: PURPLE }}
-                                    thumbColor="#fff"
-                                />
-                            </View>
-                            <View style={styles.divider} />
-                            <View style={styles.switchRow}>
-                                <Text style={styles.settingLabel}>Lowercase (a-z)</Text>
-                                <Switch
-                                    value={lower}
-                                    onValueChange={setLower}
-                                    trackColor={{ false: '#D1D5DB', true: PURPLE }}
-                                    thumbColor="#fff"
-                                />
-                            </View>
-                            <View style={styles.divider} />
-                            <View style={styles.switchRow}>
-                                <Text style={styles.settingLabel}>Numbers (0-9)</Text>
-                                <Switch
-                                    value={numbers}
-                                    onValueChange={setNumbers}
-                                    trackColor={{ false: '#D1D5DB', true: PURPLE }}
-                                    thumbColor="#fff"
-                                />
-                            </View>
-                            <View style={styles.divider} />
-                            <View style={styles.switchRow}>
-                                <Text style={styles.settingLabel}>Symbols (!@#$)</Text>
-                                <Switch
-                                    value={special}
-                                    onValueChange={setSpecial}
-                                    trackColor={{ false: '#D1D5DB', true: PURPLE }}
-                                    thumbColor="#fff"
-                                />
-                            </View>
+                        {/* Character types */}
+                        <View style={[styles.settingCard, { backgroundColor: theme.card }]}>
+                            {[
+                                { label: 'Uppercase (A-Z)', value: upper, setter: setUpper },
+                                { label: 'Lowercase (a-z)', value: lower, setter: setLower },
+                                { label: 'Numbers (0-9)', value: numbers, setter: setNumbers },
+                                { label: 'Symbols (!@#$)', value: special, setter: setSpecial },
+                            ].map(({ label, value, setter }, idx, arr) => (
+                                <View key={label}>
+                                    <View style={styles.switchRow}>
+                                        <Text style={[styles.settingLabel, { color: theme.text }]}>
+                                            {label}
+                                        </Text>
+                                        <Switch
+                                            value={value}
+                                            onValueChange={v => tryToggle(setter, v)}
+                                            trackColor={{ false: theme.border, true: PURPLE }}
+                                            thumbColor="#fff"
+                                        />
+                                    </View>
+                                    {idx < arr.length - 1 && (
+                                        <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+                                    )}
+                                </View>
+                            ))}
                         </View>
-
-                        {/* Regenerate with current settings */}
-                        <TouchableOpacity
-                            style={styles.regenerateBtn}
-                            onPress={regenerate}
-                            disabled={generating}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={styles.regenerateBtnText}>
-                                {generating ? 'Generating...' : 'Regenerate Password'}
-                            </Text>
-                        </TouchableOpacity>
                     </>
                 )}
 
-                {/* Passphrase info card */}
+                {/* ── Passphrase options ───────────────────────────── */}
                 {mode === 'passphrase' && (
-                    <View style={styles.infoCard}>
-                        <Text style={styles.infoTitle}>About Passphrases</Text>
-                        <Text style={styles.infoText}>
-                            Passphrases combine random words separated by dashes.
-                            They're easier to remember and just as secure as random
-                            passwords. Tap "New" to generate a fresh one.
-                        </Text>
-                    </View>
+                    <>
+                        {/* Separator picker */}
+                        <View style={[styles.settingCard, { backgroundColor: theme.card }]}>
+                            {/* Header row: label + live preview */}
+                            <View style={styles.sepHeaderRow}>
+                                <Text style={[styles.settingLabel, { color: theme.text }]}>
+                                    Word Separator
+                                </Text>
+                                <View style={[styles.sepPreview, { backgroundColor: PURPLE + '18' }]}>
+                                    <Text style={[styles.sepPreviewWord, { color: theme.subtext }]}>word</Text>
+                                    <Text style={[styles.sepPreviewChar, { color: PURPLE }]}>
+                                        {customSep.trim() || separator}
+                                    </Text>
+                                    <Text style={[styles.sepPreviewWord, { color: theme.subtext }]}>word</Text>
+                                </View>
+                            </View>
+
+                            <View style={[styles.divider, { backgroundColor: theme.divider, marginBottom: 12 }]} />
+
+                            {/* Quick-select chips — evenly spaced row */}
+                            <View style={styles.sepChipRow}>
+                                {QUICK_SEPS.map(s => {
+                                    const active = separator === s && !customSep.trim();
+                                    return (
+                                        <TouchableOpacity
+                                            key={s}
+                                            style={[
+                                                styles.sepChip,
+                                                {
+                                                    backgroundColor: active ? PURPLE : BG,
+                                                    borderColor: active ? PURPLE : theme.border,
+                                                },
+                                            ]}
+                                            onPress={() => { setSeparator(s); setCustomSep(''); }}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={[styles.sepChipText, { color: active ? '#fff' : theme.subtext }]}>
+                                                {s}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+
+                            <View style={[styles.divider, { backgroundColor: theme.divider, marginVertical: 12 }]} />
+
+                            {/* Custom separator row */}
+                            <View style={styles.sepCustomRow}>
+                                <Text style={[styles.settingSubLabel, { color: theme.subtext }]}>Custom:</Text>
+                                <TextInput
+                                    style={[
+                                        styles.sepInput,
+                                        {
+                                            backgroundColor: BG,
+                                            color: theme.text,
+                                            borderColor: customSep.trim() ? PURPLE : theme.border,
+                                        },
+                                    ]}
+                                    value={customSep}
+                                    onChangeText={setCustomSep}
+                                    placeholder="any char"
+                                    placeholderTextColor={theme.placeholder}
+                                    maxLength={3}
+                                    autoCapitalize="none"
+                                />
+                                {customSep.trim() ? (
+                                    <TouchableOpacity
+                                        onPress={() => setCustomSep('')}
+                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    >
+                                        <Text style={{ fontSize: 15, color: theme.placeholder }}>✕</Text>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <View style={{ width: 20 }} />
+                                )}
+                            </View>
+                        </View>
+
+                        {/* Info card */}
+                        <View style={[styles.infoCard, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.infoTitle, { color: theme.text }]}>
+                                About Passphrases
+                            </Text>
+                            <Text style={[styles.infoText, { color: theme.subtext }]}>
+                                Passphrases combine random words joined by your chosen separator.
+                                They're easier to remember and just as secure as random passwords.
+                                Tap "New" to generate a fresh one.
+                            </Text>
+                        </View>
+                    </>
                 )}
             </ScrollView>
         </SafeAreaView>
@@ -319,26 +385,19 @@ export default function GeneratorScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-    safe: {
-        flex: 1,
-        backgroundColor: BG,
-    },
     container: {
         padding: 20,
-        paddingBottom: 100,
     },
     headerTitle: {
         fontSize: 26,
         fontWeight: '800',
-        color: '#1a1a2e',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     modeToggle: {
         flexDirection: 'row',
-        backgroundColor: '#E5E7EB',
         borderRadius: 12,
         padding: 4,
-        marginBottom: 20,
+        marginBottom: 16,
     },
     modeBtn: {
         flex: 1,
@@ -347,7 +406,6 @@ const styles = StyleSheet.create({
         borderRadius: 9,
     },
     modeBtnActive: {
-        backgroundColor: '#fff',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
@@ -357,16 +415,11 @@ const styles = StyleSheet.create({
     modeBtnText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#888',
-    },
-    modeBtnTextActive: {
-        color: PURPLE,
     },
     passwordCard: {
-        backgroundColor: '#fff',
         borderRadius: 16,
         padding: 20,
-        marginBottom: 16,
+        marginBottom: 14,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
@@ -376,7 +429,6 @@ const styles = StyleSheet.create({
     passwordText: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1a1a2e',
         textAlign: 'center',
         marginBottom: 16,
         letterSpacing: 0.5,
@@ -408,19 +460,16 @@ const styles = StyleSheet.create({
     },
     copyBtn: {
         flex: 1,
-        backgroundColor: BG,
         paddingVertical: 12,
         borderRadius: 10,
         alignItems: 'center',
     },
     copyBtnText: {
-        color: '#1a1a2e',
         fontWeight: '700',
         fontSize: 14,
     },
     newBtn: {
         flex: 1,
-        backgroundColor: PURPLE,
         paddingVertical: 12,
         borderRadius: 10,
         alignItems: 'center',
@@ -431,7 +480,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     settingCard: {
-        backgroundColor: '#fff',
         borderRadius: 12,
         paddingHorizontal: 16,
         marginBottom: 12,
@@ -451,19 +499,16 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 8,
-        backgroundColor: BG,
         alignItems: 'center',
         justifyContent: 'center',
     },
     lengthBtnText: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1a1a2e',
     },
     lengthValue: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#1a1a2e',
         minWidth: 24,
         textAlign: 'center',
     },
@@ -476,44 +521,86 @@ const styles = StyleSheet.create({
     settingLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#1a1a2e',
+    },
+    settingSubLabel: {
+        fontSize: 12,
+        marginBottom: 8,
     },
     divider: {
         height: 1,
-        backgroundColor: '#F0F2F8',
     },
-    regenerateBtn: {
-        backgroundColor: PURPLE,
-        paddingVertical: 14,
-        borderRadius: 12,
+    // Separator section
+    sepHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: 4,
-        shadowColor: PURPLE,
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 4,
+        paddingVertical: 14,
     },
-    regenerateBtnText: {
-        color: '#fff',
+    sepPreview: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        gap: 2,
+    },
+    sepPreviewWord: {
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    sepPreviewChar: {
+        fontSize: 14,
+        fontWeight: '800',
+        fontFamily: 'Courier',
+        marginHorizontal: 2,
+    },
+    sepChipRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 6,
+        marginBottom: 0,
+    },
+    sepChip: {
+        flex: 1,
+        aspectRatio: 1,
+        maxHeight: 42,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1.5,
+    },
+    sepChipText: {
         fontSize: 15,
         fontWeight: '700',
     },
+    sepCustomRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingBottom: 4,
+    },
+    sepInput: {
+        flex: 1,
+        borderRadius: 8,
+        borderWidth: 1.5,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+        fontSize: 14,
+        textAlign: 'center',
+        fontFamily: 'Courier',
+    },
     infoCard: {
-        backgroundColor: '#fff',
         borderRadius: 12,
         padding: 16,
-        marginTop: 4,
+        marginTop: 0,
     },
     infoTitle: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#1a1a2e',
         marginBottom: 6,
     },
     infoText: {
         fontSize: 13,
-        color: '#555',
         lineHeight: 19,
     },
 });

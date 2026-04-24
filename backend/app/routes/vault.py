@@ -1,5 +1,6 @@
 #Task 15 — Password Vault CRUD API
 
+import os
 from flask import Blueprint, request, jsonify, g
 from app.extensions import db
 from app.models.vault_entry import VaultEntry
@@ -22,11 +23,20 @@ def _derive_key_from_request(data: dict):
         )
 
     user = User.query.filter_by(user_id=g.user_id).first()
-    if not user or not user.encryption_salt:
-        return None, (
-            jsonify({"error": {"code": "400", "message": "User encryption salt not found. Complete registration first.", "details": {}}}),
-            400,
-        )
+
+    if user is None:
+        # User authenticated via Supabase but has no local shadow row yet.
+        # Auto-provision: generate a persistent salt and create the record.
+        email = getattr(g, "token_payload", {}).get("email", f"{g.user_id}@unknown")
+        salt = os.urandom(32)
+        user = User(user_id=g.user_id, email=email, encryption_salt=salt)
+        db.session.add(user)
+        db.session.commit()
+
+    if not user.encryption_salt:
+        # Existing row but salt was never set — generate and persist it now.
+        user.encryption_salt = os.urandom(32)
+        db.session.commit()
 
     key = derive_key(master_password, user.encryption_salt)
     return key, None

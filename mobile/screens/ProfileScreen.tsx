@@ -10,13 +10,13 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../hooks/useSession';
 import apiClient from '../lib/apiClient';
-
-// ── Constants ─────────────────────────────────────────────────────
-const PURPLE = '#6C63FF';
-const BG = '#F0F2F8';
+import { useTheme } from '../lib/ThemeContext';
+import type { RootStackParamList } from '../App';
 
 // ── Types ─────────────────────────────────────────────────────────
 type VaultStats = {
@@ -28,7 +28,9 @@ type VaultStats = {
 // ─────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
     const { session } = useSession();
-    const [darkMode, setDarkMode] = useState(false);
+    const { theme, darkMode, setDarkMode } = useTheme();
+    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
     const [stats, setStats] = useState<VaultStats>({ total: 0, weak: 0, reused: 0 });
     const [statsLoading, setStatsLoading] = useState(true);
 
@@ -96,16 +98,14 @@ export default function ProfileScreen() {
         {
             icon: '🔑',
             title: 'Change Password',
-            subtitle: 'Update your master password',
-            onPress: () =>
-                Alert.alert('Coming Soon', 'This feature will be available soon.'),
+            subtitle: 'Update your account password',
+            onPress: () => navigation.navigate('ChangePassword'),
         },
         {
             icon: '📊',
             title: 'Security Reports',
-            subtitle: 'View weak & reused passwords',
-            onPress: () =>
-                Alert.alert('Coming Soon', 'This feature will be available soon.'),
+            subtitle: 'Recent data breaches & vault health',
+            onPress: () => navigation.navigate('SecurityReports'),
         },
         {
             icon: 'ℹ️',
@@ -121,66 +121,54 @@ export default function ProfileScreen() {
 
     // ── Render ────────────────────────────────────────────────
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
             <ScrollView
-                contentContainerStyle={styles.container}
+                contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Header */}
-                <Text style={styles.headerTitle}>Profile</Text>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Profile</Text>
 
-                {/* User Card */}
-                <View style={styles.userCard}>
-                    <View style={styles.avatar}>
+                {/* User card */}
+                <View style={[styles.userCard, { backgroundColor: theme.card }]}>
+                    <View style={[styles.avatar, { backgroundColor: theme.purple, shadowColor: theme.purple }]}>
                         <Text style={styles.avatarText}>{initial}</Text>
                     </View>
-                    <Text style={styles.userEmail} numberOfLines={1}>
+                    <Text style={[styles.userEmail, { color: theme.text }]} numberOfLines={1}>
                         {email}
                     </Text>
-                    <Text style={styles.memberSince}>Member since {createdAt}</Text>
+                    <Text style={[styles.memberSince, { color: theme.placeholder }]}>
+                        Member since {createdAt}
+                    </Text>
                 </View>
 
-                {/* Stats Row */}
+                {/* Stats row */}
                 <View style={styles.statsRow}>
-                    <View style={styles.statCard}>
-                        {statsLoading ? (
-                            <ActivityIndicator color={PURPLE} size="small" />
-                        ) : (
-                            <Text style={styles.statNumber}>{stats.total}</Text>
-                        )}
-                        <Text style={styles.statLabel}>Total</Text>
-                    </View>
-                    <View style={styles.statCard}>
-                        {statsLoading ? (
-                            <ActivityIndicator color="#EF4444" size="small" />
-                        ) : (
-                            <Text style={[styles.statNumber, { color: '#EF4444' }]}>
-                                {stats.weak}
-                            </Text>
-                        )}
-                        <Text style={styles.statLabel}>Weak</Text>
-                    </View>
-                    <View style={styles.statCard}>
-                        {statsLoading ? (
-                            <ActivityIndicator color="#22C55E" size="small" />
-                        ) : (
-                            <Text style={[styles.statNumber, { color: '#22C55E' }]}>
-                                {stats.reused}
-                            </Text>
-                        )}
-                        <Text style={styles.statLabel}>Reused</Text>
-                    </View>
+                    {[
+                        { label: 'Total', value: stats.total, color: theme.text },
+                        { label: 'Weak', value: stats.weak, color: '#EF4444' },
+                        { label: 'Reused', value: stats.reused, color: '#22C55E' },
+                    ].map(({ label, value, color }) => (
+                        <View key={label} style={[styles.statCard, { backgroundColor: theme.card }]}>
+                            {statsLoading ? (
+                                <ActivityIndicator color={color} size="small" />
+                            ) : (
+                                <Text style={[styles.statNumber, { color }]}>{value}</Text>
+                            )}
+                            <Text style={[styles.statLabel, { color: theme.placeholder }]}>{label}</Text>
+                        </View>
+                    ))}
                 </View>
 
-                {/* Dark Mode Toggle */}
-                <View style={styles.toggleCard}>
+                {/* Dark mode toggle — wired to ThemeContext */}
+                <View style={[styles.toggleCard, { backgroundColor: theme.card }]}>
                     <View style={styles.toggleLeft}>
                         <Text style={styles.toggleIcon}>{darkMode ? '🌙' : '☀️'}</Text>
                         <View>
-                            <Text style={styles.toggleTitle}>
+                            <Text style={[styles.toggleTitle, { color: theme.text }]}>
                                 {darkMode ? 'Dark Mode' : 'Light Mode'}
                             </Text>
-                            <Text style={styles.toggleSubtitle}>
+                            <Text style={[styles.toggleSubtitle, { color: theme.placeholder }]}>
                                 {darkMode ? 'Easier on the eyes' : 'Bright and clean'}
                             </Text>
                         </View>
@@ -188,13 +176,13 @@ export default function ProfileScreen() {
                     <Switch
                         value={darkMode}
                         onValueChange={setDarkMode}
-                        trackColor={{ false: '#D1D5DB', true: PURPLE }}
+                        trackColor={{ false: theme.border, true: theme.purple }}
                         thumbColor="#fff"
                     />
                 </View>
 
-                {/* Menu Items */}
-                <View style={styles.menuCard}>
+                {/* Menu items */}
+                <View style={[styles.menuCard, { backgroundColor: theme.card }]}>
                     {menuItems.map((item, idx) => (
                         <View key={item.title}>
                             <TouchableOpacity
@@ -204,19 +192,23 @@ export default function ProfileScreen() {
                             >
                                 <Text style={styles.menuIcon}>{item.icon}</Text>
                                 <View style={styles.menuTextContainer}>
-                                    <Text style={styles.menuTitle}>{item.title}</Text>
-                                    <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                                    <Text style={[styles.menuTitle, { color: theme.text }]}>{item.title}</Text>
+                                    <Text style={[styles.menuSubtitle, { color: theme.placeholder }]}>
+                                        {item.subtitle}
+                                    </Text>
                                 </View>
-                                <Text style={styles.menuChevron}>›</Text>
+                                <Text style={[styles.menuChevron, { color: theme.border }]}>›</Text>
                             </TouchableOpacity>
-                            {idx < menuItems.length - 1 && <View style={styles.divider} />}
+                            {idx < menuItems.length - 1 && (
+                                <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+                            )}
                         </View>
                     ))}
                 </View>
 
-                {/* Sign Out */}
+                {/* Sign out */}
                 <TouchableOpacity
-                    style={styles.signOutBtn}
+                    style={[styles.signOutBtn, { backgroundColor: theme.card }]}
                     onPress={handleSignOut}
                     activeOpacity={0.85}
                 >
@@ -229,26 +221,19 @@ export default function ProfileScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-    safe: {
-        flex: 1,
-        backgroundColor: BG,
-    },
     container: {
         padding: 20,
-        paddingBottom: 100,
     },
     headerTitle: {
         fontSize: 26,
         fontWeight: '800',
-        color: '#1a1a2e',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     userCard: {
-        backgroundColor: '#fff',
         borderRadius: 16,
         padding: 24,
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 14,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
@@ -259,11 +244,9 @@ const styles = StyleSheet.create({
         width: 72,
         height: 72,
         borderRadius: 24,
-        backgroundColor: PURPLE,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 12,
-        shadowColor: PURPLE,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.35,
         shadowRadius: 8,
@@ -277,21 +260,18 @@ const styles = StyleSheet.create({
     userEmail: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#1a1a2e',
         marginBottom: 4,
     },
     memberSince: {
         fontSize: 13,
-        color: '#888',
     },
     statsRow: {
         flexDirection: 'row',
         gap: 10,
-        marginBottom: 16,
+        marginBottom: 14,
     },
     statCard: {
         flex: 1,
-        backgroundColor: '#fff',
         borderRadius: 12,
         paddingVertical: 18,
         alignItems: 'center',
@@ -304,45 +284,37 @@ const styles = StyleSheet.create({
     statNumber: {
         fontSize: 24,
         fontWeight: '800',
-        color: '#1a1a2e',
         marginBottom: 2,
     },
     statLabel: {
         fontSize: 12,
-        color: '#888',
         fontWeight: '600',
     },
     toggleCard: {
-        backgroundColor: '#fff',
         borderRadius: 12,
         padding: 16,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 14,
     },
     toggleLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
     },
-    toggleIcon: {
-        fontSize: 22,
-    },
+    toggleIcon: { fontSize: 22 },
     toggleTitle: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#1a1a2e',
     },
     toggleSubtitle: {
         fontSize: 12,
-        color: '#888',
         marginTop: 2,
     },
     menuCard: {
-        backgroundColor: '#fff',
         borderRadius: 12,
-        marginBottom: 16,
+        marginBottom: 14,
         overflow: 'hidden',
     },
     menuItem: {
@@ -351,35 +323,16 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: 16,
     },
-    menuIcon: {
-        fontSize: 22,
-        marginRight: 14,
-    },
-    menuTextContainer: {
-        flex: 1,
-    },
-    menuTitle: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#1a1a2e',
-    },
-    menuSubtitle: {
-        fontSize: 12,
-        color: '#888',
-        marginTop: 2,
-    },
-    menuChevron: {
-        fontSize: 22,
-        color: '#ccc',
-        fontWeight: '300',
-    },
+    menuIcon: { fontSize: 22, marginRight: 14 },
+    menuTextContainer: { flex: 1 },
+    menuTitle: { fontSize: 15, fontWeight: '700' },
+    menuSubtitle: { fontSize: 12, marginTop: 2 },
+    menuChevron: { fontSize: 22, fontWeight: '300' },
     divider: {
         height: 1,
-        backgroundColor: '#F0F2F8',
         marginLeft: 52,
     },
     signOutBtn: {
-        backgroundColor: '#fff',
         borderRadius: 12,
         paddingVertical: 15,
         alignItems: 'center',
