@@ -24,7 +24,7 @@ const RECENT_BREACHES = [
         severity: 'critical' as const,
         details:
             'Social Security numbers, names, addresses, and phone numbers leaked from a background-check data broker.',
-        articleUrl: 'https://www.bleepingcomputer.com/news/security/national-public-data-breach-exposes-personal-info-of-2-9-billion-people/',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/national-public-data-confirms-breach-exposing-social-security-numbers/',
     },
     {
         id: '2',
@@ -34,7 +34,7 @@ const RECENT_BREACHES = [
         severity: 'high' as const,
         details:
             'Customer names, addresses, phone numbers, partial payment card data exposed by the ShinyHunters group.',
-        articleUrl: 'https://www.bleepingcomputer.com/news/security/ticketmaster-confirms-massive-breach-after-hacker-tries-to-sell-stolen-data/',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/ticketmaster-confirms-massive-breach-after-stolen-data-for-sale-online/',
     },
     {
         id: '3',
@@ -44,7 +44,7 @@ const RECENT_BREACHES = [
         severity: 'high' as const,
         details:
             'Call and text metadata for nearly all AT&T wireless customers exposed from a third-party cloud platform.',
-        articleUrl: 'https://www.bleepingcomputer.com/news/security/atandt-says-criminals-stole-phone-records-of-nearly-all-cellular-customers/',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/massive-atandt-data-breach-exposes-call-logs-of-109-million-customers/',
     },
     {
         id: '4',
@@ -54,7 +54,7 @@ const RECENT_BREACHES = [
         severity: 'medium' as const,
         details:
             'Customer order data including names, physical addresses, and Dell hardware details posted to a hacking forum.',
-        articleUrl: 'https://www.bleepingcomputer.com/news/security/dell-warns-of-data-breach-exposing-customer-information/',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/dell-api-abused-to-steal-49-million-customer-records-in-data-breach/',
     },
     {
         id: '5',
@@ -64,7 +64,7 @@ const RECENT_BREACHES = [
         severity: 'critical' as const,
         details:
             'Largest healthcare data breach in US history. Patient records, insurance details, and medical histories exposed.',
-        articleUrl: 'https://www.bleepingcomputer.com/news/security/change-healthcare-confirms-ransomware-gang-behind-cyberattack/',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/unitedhealth-says-data-of-100-million-stolen-in-change-healthcare-breach/',
     },
     {
         id: '6',
@@ -74,7 +74,7 @@ const RECENT_BREACHES = [
         severity: 'medium' as const,
         details:
             'Email addresses scraped via public API and combined with profile data, then published on a hacking forum.',
-        articleUrl: 'https://www.bleepingcomputer.com/news/security/15-million-trello-users-have-their-data-scraped-and-shared-online/',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/trello-api-abused-to-link-email-addresses-to-15-million-accounts/',
     },
 ];
 

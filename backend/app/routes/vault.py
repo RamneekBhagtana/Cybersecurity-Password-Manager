@@ -278,6 +278,36 @@ def update_vault_entry(entry_id):
     return jsonify({"updated": True}), 200
 
 
+# POST /vault/recompute-strengths — decrypt all entries and score password strength
+
+@vault_bp.route("/recompute-strengths", methods=["POST"])
+@require_auth
+def recompute_strengths():
+    """
+    Decrypts every vault entry for the authenticated user and (re)computes
+    password_strength.  Requires master_password in the JSON body.
+    Returns {updated, failed}.
+    """
+    data = request.get_json(silent=True) or {}
+    key, err = _derive_key_from_request(data)
+    if err:
+        return err
+
+    entries = VaultEntry.query.filter_by(user_id=g.user_id).all()
+    updated = 0
+    failed = 0
+    for entry in entries:
+        try:
+            plaintext = decrypt(entry.encrypted_password, entry.iv, entry.auth_tag, key)
+            entry.password_strength = _compute_strength(plaintext)
+            updated += 1
+        except DecryptionError:
+            failed += 1
+
+    db.session.commit()
+    return jsonify({"updated": updated, "failed": failed}), 200
+
+
 # DELETE /vault/<entry_id> — delete an entry
 
 @vault_bp.route("/<uuid:entry_id>", methods=["DELETE"])

@@ -1,5 +1,5 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     View,
     Text,
@@ -14,6 +14,8 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Platform,
+    Animated,
+    PanResponder,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../lib/apiClient';
@@ -469,20 +471,67 @@ type ManageCatsProps = {
     onChange: (next: string[]) => void;
 };
 
+const ITEM_H = 56; // row height + margin — used to compute drop position
+
 function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: ManageCatsProps) {
     const { theme } = useTheme();
     const [draft, setDraft] = useState<string[]>([]);
     const [newCat, setNewCat] = useState('');
+    const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+    const dragOffset = useRef(new Animated.Value(0)).current;
+    const draggingIdxRef = useRef<number | null>(null);
+    const draftRef = useRef<string[]>([]);
 
-    useEffect(() => { if (visible) setDraft([...order]); }, [visible, order]);
+    useEffect(() => {
+        if (visible) {
+            setDraft([...order]);
+            draftRef.current = [...order];
+        }
+    }, [visible, order]);
 
-    const move = (idx: number, dir: -1 | 1) => {
-        const next = [...draft];
-        const target = idx + dir;
-        if (target < 0 || target >= next.length) return;
-        [next[idx], next[target]] = [next[target], next[idx]];
-        setDraft(next);
-    };
+    // Keep draftRef in sync so release handler always sees current order
+    useEffect(() => { draftRef.current = draft; }, [draft]);
+
+    const createPanResponder = useCallback((index: number) => {
+        return PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderGrant: () => {
+                draggingIdxRef.current = index;
+                setDraggingIdx(index);
+                dragOffset.setValue(0);
+            },
+            onPanResponderMove: (_evt, gs) => {
+                dragOffset.setValue(gs.dy);
+            },
+            onPanResponderRelease: (_evt, gs) => {
+                const from = draggingIdxRef.current!;
+                const moved = Math.round(gs.dy / ITEM_H);
+                const to = Math.max(0, Math.min(draftRef.current.length - 1, from + moved));
+                if (from !== to) {
+                    const next = [...draftRef.current];
+                    const [item] = next.splice(from, 1);
+                    next.splice(to, 0, item);
+                    setDraft(next);
+                }
+                dragOffset.setValue(0);
+                setDraggingIdx(null);
+                draggingIdxRef.current = null;
+            },
+            onPanResponderTerminate: () => {
+                dragOffset.setValue(0);
+                setDraggingIdx(null);
+                draggingIdxRef.current = null;
+            },
+        });
+    }, [dragOffset]);
+
+    // panResponders[i] always corresponds to visual position i — correct after reorders
+    const panResponders = useMemo(
+        () => draft.map((_, i) => createPanResponder(i)),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [draft.length, createPanResponder],
+    );
 
     const remove = (idx: number) => {
         setDraft(d => d.filter((_, i) => i !== idx));
@@ -504,25 +553,47 @@ function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: Ma
                         <Text style={{ fontSize: 15, color: theme.placeholder }}>Cancel</Text>
                     </TouchableOpacity>
                 </View>
-                <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-                    {draft.map((cat, idx) => (
-                        <View key={cat} style={[catStyles.row, { backgroundColor: theme.card }]}>
-                            <Text style={[catStyles.catName, { color: theme.text }]}>
-                                {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                            </Text>
-                            <View style={catStyles.rowActions}>
-                                <TouchableOpacity onPress={() => move(idx, -1)} style={catStyles.iconBtn}>
-                                    <Text style={[catStyles.iconText, { color: theme.subtext }]}>↑</Text>
+
+                {/* Disable scroll while user is dragging an item */}
+                <ScrollView
+                    contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+                    scrollEnabled={draggingIdx === null}
+                >
+                    <Text style={[catStyles.hint, { color: theme.placeholder }]}>
+                        Hold ≡ and drag to reorder
+                    </Text>
+
+                    {draft.map((cat, idx) => {
+                        const isDragging = draggingIdx === idx;
+                        const animStyle = isDragging
+                            ? { transform: [{ translateY: dragOffset }], zIndex: 999, elevation: 5 }
+                            : { zIndex: 1, elevation: 0 };
+                        return (
+                            <Animated.View
+                                key={cat}
+                                style={[catStyles.row, { backgroundColor: theme.card }, animStyle]}
+                            >
+                                {/* Drag handle */}
+                                <View
+                                    style={catStyles.dragHandle}
+                                    {...panResponders[idx]?.panHandlers}
+                                >
+                                    <Text style={[catStyles.dragIcon, { color: theme.placeholder }]}>≡</Text>
+                                </View>
+
+                                <Text style={[catStyles.catName, { color: theme.text }]}>
+                                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                </Text>
+
+                                <TouchableOpacity
+                                    onPress={() => remove(idx)}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                    <Text style={{ fontSize: 16, color: '#EF4444', fontWeight: '700' }}>✕</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => move(idx, 1)} style={catStyles.iconBtn}>
-                                    <Text style={[catStyles.iconText, { color: theme.subtext }]}>↓</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={() => remove(idx)} style={catStyles.iconBtn}>
-                                    <Text style={[catStyles.iconText, { color: '#EF4444' }]}>✕</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    ))}
+                            </Animated.View>
+                        );
+                    })}
 
                     <Text style={[catStyles.addLabel, { color: theme.subtext }]}>ADD CATEGORY</Text>
                     <View style={catStyles.addRow}>
@@ -561,17 +632,107 @@ function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: Ma
 const catStyles = StyleSheet.create({
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingBottom: 12 },
     title: { fontSize: 20, fontWeight: '800' },
+    hint: { fontSize: 12, marginBottom: 12 },
     row: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
     catName: { flex: 1, fontSize: 14, fontWeight: '600' },
-    rowActions: { flexDirection: 'row', gap: 4 },
-    iconBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-    iconText: { fontSize: 16, fontWeight: '700' },
+    dragHandle: { paddingRight: 12, paddingVertical: 4 },
+    dragIcon: { fontSize: 20 },
     addLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginTop: 20, marginBottom: 8 },
     addRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
     addInput: { flex: 1, borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14 },
     addBtn: { width: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
     saveBtn: { borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
 });
+
+// ── Rate-all modal ────────────────────────────────────────────────
+type RateAllProps = {
+    visible: boolean;
+    purple: string;
+    onClose: () => void;
+    onDone: () => void;
+};
+
+function RateAllModal({ visible, purple, onClose, onDone }: RateAllProps) {
+    const { theme } = useTheme();
+    const [masterPassword, setMasterPassword] = useState('');
+    const [showMaster, setShowMaster] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (visible) { setMasterPassword(''); setShowMaster(false); }
+    }, [visible]);
+
+    const handleRate = async () => {
+        if (!masterPassword.trim()) {
+            Alert.alert('Required', 'Enter your master password to analyze passwords.');
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await apiClient.post('/vault/recompute-strengths', {
+                master_password: masterPassword.trim(),
+            });
+            const { updated, failed } = res.data;
+            Alert.alert(
+                'Done',
+                `${updated} password${updated !== 1 ? 's' : ''} analyzed${failed ? `, ${failed} could not be decrypted` : ''}.`,
+            );
+            onDone();
+            onClose();
+        } catch (err: any) {
+            const msg =
+                err.response?.data?.error?.message ??
+                err.message ??
+                'Failed to analyze passwords.';
+            Alert.alert('Error', msg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+            <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
+                <View style={{ padding: 20 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <Text style={{ fontSize: 22, fontWeight: '800', color: theme.text }}>Rate Passwords</Text>
+                        <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Text style={{ fontSize: 15, color: theme.placeholder }}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={{ color: theme.subtext, fontSize: 14, lineHeight: 20, marginBottom: 20 }}>
+                        Enter your master password to decrypt and rate the strength of all existing vault entries.
+                    </Text>
+                    <Text style={[formStyles.label, { color: theme.subtext }]}>MASTER PASSWORD</Text>
+                    <View style={[formStyles.input, formStyles.rowInput, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+                        <TextInput
+                            style={[formStyles.rowInputField, { color: theme.text }]}
+                            value={masterPassword}
+                            onChangeText={setMasterPassword}
+                            placeholder="Your master password"
+                            placeholderTextColor={theme.placeholder}
+                            secureTextEntry={!showMaster}
+                            autoCapitalize="none"
+                        />
+                        <TouchableOpacity onPress={() => setShowMaster(v => !v)} style={formStyles.eyeBtn}>
+                            <Text style={{ fontSize: 16 }}>{showMaster ? '🙈' : '👁'}</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity
+                        style={[formStyles.saveBtn, { backgroundColor: purple, marginTop: 24, opacity: loading ? 0.7 : 1 }]}
+                        onPress={handleRate}
+                        disabled={loading}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={formStyles.saveBtnText}>
+                            {loading ? 'Analyzing…' : 'Analyze & Rate Passwords'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        </Modal>
+    );
+}
 
 // ── Main screen ───────────────────────────────────────────────────
 export default function VaultScreen() {
@@ -585,6 +746,7 @@ export default function VaultScreen() {
     const [modalVisible, setModalVisible] = useState(false);
     const [editingEntry, setEditingEntry] = useState<VaultEntry | null>(null);
     const [manageCatsVisible, setManageCatsVisible] = useState(false);
+    const [rateAllVisible, setRateAllVisible] = useState(false);
     const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
 
     // ── Load / persist category order ─────────────────────────
@@ -649,6 +811,8 @@ export default function VaultScreen() {
         activeTag === 'all'
             ? entries
             : entries.filter(e => e.tags.includes(activeTag));
+
+    const hasUnrated = entries.some(e => e.password_strength === null);
 
     // ── Loading state ─────────────────────────────────────────
     if (loading) {
@@ -733,6 +897,32 @@ export default function VaultScreen() {
                 data={filtered}
                 keyExtractor={e => e.entry_id}
                 contentContainerStyle={styles.list}
+                ListHeaderComponent={
+                    hasUnrated ? (
+                        <TouchableOpacity
+                            style={[
+                                styles.unratedBanner,
+                                {
+                                    backgroundColor: theme.isDark ? '#1a1520' : '#FFF8F0',
+                                    borderColor: theme.isDark ? '#3a2a3e' : '#FDDCB0',
+                                },
+                            ]}
+                            onPress={() => setRateAllVisible(true)}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={{ fontSize: 16, marginRight: 10 }}>⚠️</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: theme.isDark ? '#F59E0B' : '#92400E', fontWeight: '700', fontSize: 13 }}>
+                                    Some passwords haven't been rated
+                                </Text>
+                                <Text style={{ color: theme.isDark ? '#F59E0B' : '#B45309', fontSize: 12, marginTop: 2 }}>
+                                    Tap to analyze all password strengths
+                                </Text>
+                            </View>
+                            <Text style={{ color: theme.isDark ? '#F59E0B' : '#92400E', fontSize: 20 }}>›</Text>
+                        </TouchableOpacity>
+                    ) : null
+                }
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -819,6 +1009,14 @@ export default function VaultScreen() {
                 purple={PURPLE}
                 onClose={() => setManageCatsVisible(false)}
                 onChange={saveCategoryOrder}
+            />
+
+            {/* Rate all passwords modal */}
+            <RateAllModal
+                visible={rateAllVisible}
+                purple={PURPLE}
+                onClose={() => setRateAllVisible(false)}
+                onDone={fetchVault}
             />
         </SafeAreaView>
     );
@@ -932,4 +1130,12 @@ const styles = StyleSheet.create({
         elevation: 8,
     },
     fabIcon: { color: '#fff', fontSize: 28, fontWeight: '300', marginTop: -2 },
+    unratedBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 10,
+        borderWidth: 1,
+        padding: 12,
+        marginBottom: 12,
+    },
 });
