@@ -4,6 +4,7 @@ import hashlib
 import os
 import re
 from flask import Blueprint, request, jsonify, g
+from sqlalchemy import text
 from app.extensions import db
 from app.models.vault_entry import VaultEntry
 from app.models.tag import Tag
@@ -157,12 +158,27 @@ def get_vault():
         .all()
     )
 
-    # Count how many entries share a password_hash with at least one other entry.
-    hash_counts: dict[str, int] = {}
-    for e in entries:
-        if e.password_hash:
-            hash_counts[e.password_hash] = hash_counts.get(e.password_hash, 0) + 1
-    reused_count = sum(1 for e in entries if e.password_hash and hash_counts[e.password_hash] > 1)
+    # Count entries whose password_hash matches at least one other entry for
+    # this user.  Wrapped in try/except so the endpoint keeps working even if
+    # the migration adding password_hash hasn't been applied yet.
+    try:
+        row = db.session.execute(
+            text("""
+                SELECT COUNT(*) FROM vault_entries e1
+                WHERE e1.user_id = :uid
+                  AND e1.password_hash IS NOT NULL
+                  AND EXISTS (
+                      SELECT 1 FROM vault_entries e2
+                      WHERE e2.user_id    = :uid
+                        AND e2.password_hash = e1.password_hash
+                        AND e2.entry_id   != e1.entry_id
+                  )
+            """),
+            {"uid": str(g.user_id)},
+        )
+        reused_count = row.scalar() or 0
+    except Exception:
+        reused_count = 0
 
     return jsonify({
         "entries": [_serialize_summary(e) for e in entries],

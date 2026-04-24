@@ -33,6 +33,7 @@ from sqlalchemy import (
     event,
 )
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import deferred
 
 from app.extensions import db
 
@@ -117,12 +118,14 @@ class VaultEntry(db.Model):
     # ------------------------------------------------------------------ #
     #  Password hash (SHA-256 of the plaintext password)                   #
     #  Used solely for reuse detection — never exposes the plaintext.      #
+    #  Marked deferred so it is NOT included in the main SELECT —          #
+    #  this keeps GET /vault working even before the migration has run.    #
     # ------------------------------------------------------------------ #
-    password_hash = Column(
+    password_hash = deferred(Column(
         String(64),
         nullable=True,
         comment="SHA-256 hex digest of plaintext password — for reuse detection only",
-    )
+    ))
 
     # ------------------------------------------------------------------ #
     #  Encrypted credential — three columns, always used together          #
