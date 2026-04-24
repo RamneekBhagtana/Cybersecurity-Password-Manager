@@ -53,6 +53,14 @@ function getStrengthInfo(password: string): { label: string; color: string; scor
     return { label: 'Very Strong — centuries to crack', color: '#22C55E', score: 4 };
 }
 
+// Passphrase strength is determined solely by word count (2–5)
+function getPassphraseStrength(words: number): { label: string; color: string; score: number } {
+    if (words <= 2) return { label: 'Weak',   color: '#EF4444', score: 1 };
+    if (words === 3) return { label: 'Fair',   color: '#F59E0B', score: 2 };
+    if (words === 4) return { label: 'Good',   color: '#84CC16', score: 3 };
+    return              { label: 'Strong',  color: '#22C55E', score: 4 };
+}
+
 // ── Passphrase quick-select separators ────────────────────────────
 const QUICK_SEPS = ['-', '_', '.', '!', '@', '#', '*'];
 
@@ -144,7 +152,9 @@ export default function GeneratorScreen() {
     const adjustWordCount = (delta: number) =>
         setWordCount(n => Math.min(5, Math.max(2, n + delta)));
 
-    const strength = getStrengthInfo(password);
+    const strength = mode === 'passphrase'
+        ? getPassphraseStrength(wordCount)
+        : getStrengthInfo(password);
 
     // ── Render ────────────────────────────────────────────────
     return (

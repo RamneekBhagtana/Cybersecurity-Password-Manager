@@ -40,7 +40,7 @@ def generate_passphrase():
 
     data = request.get_json() or {}
     count = int(data.get("words", 4))
-    count = max(3, min(10, count))
+    count = max(2, min(5, count))
     separator = data.get("separator", "-")
     capitalize = bool(data.get("capitalize", False))
 

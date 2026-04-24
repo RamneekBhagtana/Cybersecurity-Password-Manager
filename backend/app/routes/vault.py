@@ -15,12 +15,31 @@ vault_bp = Blueprint("vault", __name__, url_prefix="/vault")
 
 def _compute_strength(password: str) -> int:
     """
-    Return 1 (Weak) – 4 (Strong) based on the criteria:
+    Return 1 (Weak) – 4 (Strong).
+
+    Passphrases (alphabetic words joined by a common separator) are scored
+    by word count:  2=Weak  3=Fair  4=Good  5+=Strong
+
+    Regular passwords are scored by character-complexity criteria:
       • ≥ 16 characters
       • at least one uppercase letter
       • at least one digit
       • at least one special character
     """
+    # Passphrase detection — split on a single repeated separator character
+    for sep in ('-', '_', '.', ' ', '|'):
+        parts = password.split(sep)
+        if len(parts) >= 2 and all(p.isalpha() and len(p) >= 2 for p in parts):
+            word_count = len(parts)
+            if word_count <= 2:
+                return 1  # Weak
+            if word_count == 3:
+                return 2  # Fair
+            if word_count == 4:
+                return 3  # Good
+            return 4      # Strong (5+ words)
+
+    # Regular password scoring
     score = 0
     if len(password) >= 16:
         score += 1
