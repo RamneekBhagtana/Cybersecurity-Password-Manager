@@ -26,6 +26,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Integer,
     LargeBinary,
     String,
     Text,
@@ -101,6 +102,16 @@ class VaultEntry(db.Model):
         Text,
         nullable=True,
         comment="Optional freeform notes (stored plaintext)",
+    )
+
+    # ------------------------------------------------------------------ #
+    #  Password strength score (1=Weak, 2=Fair, 3=Good, 4=Strong)         #
+    #  Computed from the plaintext password at create/update time.         #
+    # ------------------------------------------------------------------ #
+    password_strength = Column(
+        Integer,
+        nullable=True,
+        comment="1=Weak 2=Fair 3=Good 4=Strong — computed at save time from plaintext",
     )
 
     # ------------------------------------------------------------------ #

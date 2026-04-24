@@ -144,7 +144,7 @@ export default function GeneratorScreen() {
 
     // ── Render ────────────────────────────────────────────────
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: BG }}>
             <ScrollView
                 contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
                 showsVerticalScrollIndicator={false}

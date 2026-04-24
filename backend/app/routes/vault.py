@@ -1,6 +1,7 @@
 #Task 15 — Password Vault CRUD API
 
 import os
+import re
 from flask import Blueprint, request, jsonify, g
 from app.extensions import db
 from app.models.vault_entry import VaultEntry
@@ -10,6 +11,26 @@ from app.services.encryption import encrypt, decrypt, derive_key, DecryptionErro
 from app.utils.auth import require_auth
 
 vault_bp = Blueprint("vault", __name__, url_prefix="/vault")
+
+
+def _compute_strength(password: str) -> int:
+    """
+    Return 1 (Weak) – 4 (Strong) based on the criteria:
+      • ≥ 16 characters
+      • at least one uppercase letter
+      • at least one digit
+      • at least one special character
+    """
+    score = 0
+    if len(password) >= 16:
+        score += 1
+    if re.search(r'[A-Z]', password):
+        score += 1
+    if re.search(r'[0-9]', password):
+        score += 1
+    if re.search(r'[^A-Za-z0-9]', password):
+        score += 1
+    return max(1, score)
 
 
 # Internal helpers
@@ -66,6 +87,7 @@ def _serialize_summary(entry: VaultEntry) -> dict:
         "username": entry.username,
         "url": entry.url,
         "tags": [t.tag_name for t in entry.tags],
+        "password_strength": entry.password_strength,
         "created_at": entry.created_at.isoformat() if entry.created_at else None,
         "updated_at": entry.updated_at.isoformat() if entry.updated_at else None,
     }
@@ -153,6 +175,7 @@ def create_vault_entry():
         encrypted_password=ciphertext,
         iv=iv,
         auth_tag=auth_tag,
+        password_strength=_compute_strength(password),
     )
     db.session.add(entry)
     db.session.flush()
@@ -244,6 +267,7 @@ def update_vault_entry(entry_id):
         entry.encrypted_password = ciphertext
         entry.iv = iv
         entry.auth_tag = auth_tag
+        entry.password_strength = _compute_strength(new_password)
 
     if "tags" in data:
         entry.tags = _resolve_tags(data["tags"], g.user_id)

@@ -1,5 +1,5 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -10,7 +10,7 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../hooks/useSession';
@@ -44,24 +44,30 @@ export default function ProfileScreen() {
           })
         : 'Mar 2026';
 
-    // ── Fetch vault stats ─────────────────────────────────────
-    useEffect(() => {
-        let cancelled = false;
-        const fetchStats = async () => {
-            try {
-                const res = await apiClient.get('/vault');
-                if (cancelled) return;
-                const entries: any[] = res.data.entries ?? [];
-                setStats({ total: entries.length, weak: 0, reused: 0 });
-            } catch {
-                // Non-critical — silently ignore
-            } finally {
-                if (!cancelled) setStatsLoading(false);
-            }
-        };
-        fetchStats();
-        return () => { cancelled = true; };
-    }, []);
+    // ── Fetch vault stats — re-runs every time this tab gains focus ───
+    useFocusEffect(
+        useCallback(() => {
+            let cancelled = false;
+            setStatsLoading(true);
+            const fetchStats = async () => {
+                try {
+                    const res = await apiClient.get('/vault');
+                    if (cancelled) return;
+                    const entries: any[] = res.data.entries ?? [];
+                    const weakCount = entries.filter(
+                        (e: any) => e.password_strength === 1
+                    ).length;
+                    setStats({ total: entries.length, weak: weakCount, reused: 0 });
+                } catch {
+                    // Non-critical — silently ignore
+                } finally {
+                    if (!cancelled) setStatsLoading(false);
+                }
+            };
+            fetchStats();
+            return () => { cancelled = true; };
+        }, [])
+    );
 
     // ── Sign out ──────────────────────────────────────────────
     const handleSignOut = () => {
@@ -103,7 +109,7 @@ export default function ProfileScreen() {
 
     // ── Render ────────────────────────────────────────────────
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
             <ScrollView
                 contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
                 showsVerticalScrollIndicator={false}

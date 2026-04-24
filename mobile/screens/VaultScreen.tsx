@@ -25,9 +25,36 @@ type VaultEntry = {
     username: string | null;
     url: string | null;
     tags: string[];
+    password_strength: number | null;
     created_at: string | null;
     updated_at: string | null;
 };
+
+// ── Password strength ─────────────────────────────────────────────
+function getStrengthInfo(score: number | null): { label: string; color: string } {
+    switch (score) {
+        case 1: return { label: 'Weak', color: '#EF4444' };
+        case 2: return { label: 'Fair', color: '#F59E0B' };
+        case 3: return { label: 'Good', color: '#84CC16' };
+        case 4: return { label: 'Strong', color: '#22C55E' };
+        default: return { label: 'Unknown', color: '#9CA3AF' };
+    }
+}
+
+const WEAK_RECOMMENDATION =
+    'For a strong password use at least 16 characters including ' +
+    'an uppercase letter, a number, and a special character (e.g. !@#$).';
+
+function showWeakAlert(onUpdate: () => void) {
+    Alert.alert(
+        'Weak Password',
+        WEAK_RECOMMENDATION,
+        [
+            { text: 'Dismiss', style: 'cancel' },
+            { text: 'Update Password', onPress: onUpdate },
+        ]
+    );
+}
 
 // ── Constants ─────────────────────────────────────────────────────
 const PRESET_CATEGORIES = ['work', 'personal', 'school'];
@@ -147,7 +174,7 @@ function EntryFormModal({ visible, editing, purple, onClose, onSaved }: EntryFor
             presentationStyle="pageSheet"
             onRequestClose={onClose}
         >
-            <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
+            <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
                 <KeyboardAvoidingView
                     style={{ flex: 1 }}
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -481,7 +508,7 @@ export default function VaultScreen() {
     // ── Loading state ─────────────────────────────────────────
     if (loading) {
         return (
-            <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
+            <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                     <ActivityIndicator size="large" color={PURPLE} />
                     <Text style={{ marginTop: 12, color: theme.placeholder, fontSize: 14 }}>
@@ -494,7 +521,7 @@ export default function VaultScreen() {
 
     // ── Main render ───────────────────────────────────────────
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
             {/*
              * Compact top section — title + item count on one line,
              * category chips directly below with zero wasted space.
@@ -568,13 +595,22 @@ export default function VaultScreen() {
                 }
                 renderItem={({ item }) => {
                     const { initial, bg } = getIconStyle(item.title);
+                    const strength = getStrengthInfo(item.password_strength);
+                    const isWeak = item.password_strength === 1;
+                    const openEntry = () => {
+                        setEditingEntry(item);
+                        setModalVisible(true);
+                    };
                     return (
                         <TouchableOpacity
                             style={[styles.entryCard, { backgroundColor: theme.card }]}
                             activeOpacity={0.85}
                             onPress={() => {
-                                setEditingEntry(item);
-                                setModalVisible(true);
+                                if (isWeak) {
+                                    showWeakAlert(openEntry);
+                                } else {
+                                    openEntry();
+                                }
                             }}
                         >
                             <View style={[styles.entryIcon, { backgroundColor: bg }]}>
@@ -589,11 +625,9 @@ export default function VaultScreen() {
                                         {item.username}
                                     </Text>
                                 )}
-                                {item.tags.length > 0 && (
-                                    <Text style={[styles.entryTag, { color: PURPLE }]}>
-                                        {item.tags[0]}
-                                    </Text>
-                                )}
+                                <Text style={[styles.entryTag, { color: strength.color }]}>
+                                    {strength.label}
+                                </Text>
                             </View>
                             <Text style={[styles.chevron, { color: theme.border }]}>›</Text>
                         </TouchableOpacity>
