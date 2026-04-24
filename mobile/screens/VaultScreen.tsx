@@ -87,11 +87,13 @@ type EntryFormProps = {
     visible: boolean;
     editing: VaultEntry | null;
     purple: string;
+    categories: string[];       // all user-defined categories (for chip picker)
     onClose: () => void;
     onSaved: () => void;
+    onDelete: (entryId: string) => void;
 };
 
-function EntryFormModal({ visible, editing, purple, onClose, onSaved }: EntryFormProps) {
+function EntryFormModal({ visible, editing, purple, categories, onClose, onSaved, onDelete }: EntryFormProps) {
     const { theme } = useTheme();
 
     const [title, setTitle] = useState('');
@@ -99,15 +101,14 @@ function EntryFormModal({ visible, editing, purple, onClose, onSaved }: EntryFor
     const [password, setPassword] = useState('');
     const [masterPassword, setMasterPassword] = useState('');
     const [notes, setNotes] = useState('');
-    // Category: either a preset or a custom string
-    const [selectedPreset, setSelectedPreset] = useState('');
+    const [selectedCat, setSelectedCat] = useState('');
     const [customCat, setCustomCat] = useState('');
     const [saving, setSaving] = useState(false);
     const [showPwd, setShowPwd] = useState(false);
     const [showMaster, setShowMaster] = useState(false);
 
     // Derived: actual tag value to submit
-    const effectiveCategory = customCat.trim() || selectedPreset;
+    const effectiveCategory = customCat.trim() || selectedCat;
 
     // Populate fields when modal opens
     useEffect(() => {
@@ -118,17 +119,17 @@ function EntryFormModal({ visible, editing, purple, onClose, onSaved }: EntryFor
             setMasterPassword('');
             setNotes('');
             const existingTag = editing?.tags[0] ?? '';
-            if (PRESET_CATEGORIES.includes(existingTag)) {
-                setSelectedPreset(existingTag);
+            if (categories.includes(existingTag)) {
+                setSelectedCat(existingTag);
                 setCustomCat('');
             } else {
-                setSelectedPreset('');
+                setSelectedCat('');
                 setCustomCat(existingTag);
             }
             setShowPwd(false);
             setShowMaster(false);
         }
-    }, [visible, editing]);
+    }, [visible, editing, categories]);
 
     // Master password is only needed when creating (always) or editing with a new password.
     const needsMasterPwd = !editing || !!password.trim();
@@ -167,14 +168,51 @@ function EntryFormModal({ visible, editing, purple, onClose, onSaved }: EntryFor
             onSaved();
             onClose();
         } catch (err: any) {
-            const msg =
+            let msg: string =
                 err.response?.data?.error?.message ??
                 err.message ??
                 'Failed to save entry.';
+            if (err.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout')) {
+                msg = 'Request timed out. Check your connection and try again.';
+            } else if (msg.toLowerCase().includes('decryption failed')) {
+                msg = 'Incorrect master password — decryption failed. Please try again.';
+            }
             Alert.alert('Error', msg);
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleDelete = () => {
+        if (!editing) return;
+        Alert.alert(
+            'Delete Entry',
+            `Delete "${editing.title}"? This action cannot be undone.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        Alert.alert(
+                            'Are you sure?',
+                            'This will permanently delete the entry and its password.',
+                            [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                    text: 'Yes, Delete',
+                                    style: 'destructive',
+                                    onPress: () => {
+                                        onDelete(editing.entry_id);
+                                        onClose();
+                                    },
+                                },
+                            ],
+                        );
+                    },
+                },
+            ],
+        );
     };
 
     const inputBase = [
@@ -203,12 +241,22 @@ function EntryFormModal({ visible, editing, purple, onClose, onSaved }: EntryFor
                             <Text style={[formStyles.modalTitle, { color: theme.text }]}>
                                 {editing ? 'Edit Entry' : 'New Entry'}
                             </Text>
-                            <TouchableOpacity
-                                onPress={onClose}
-                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            >
-                                <Text style={{ fontSize: 16, color: theme.placeholder }}>Cancel</Text>
-                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                                {editing && (
+                                    <TouchableOpacity
+                                        onPress={handleDelete}
+                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    >
+                                        <Text style={{ fontSize: 14, color: '#EF4444', fontWeight: '600' }}>Delete</Text>
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity
+                                    onPress={onClose}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                    <Text style={{ fontSize: 16, color: theme.placeholder }}>Cancel</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         {/* Title */}
@@ -258,69 +306,69 @@ function EntryFormModal({ visible, editing, purple, onClose, onSaved }: EntryFor
                             </TouchableOpacity>
                         </View>
 
-                        {/* Category */}
-                        <Text style={[formStyles.label, { color: theme.subtext, marginTop: 14 }]}>
-                            CATEGORY
-                        </Text>
+                        {/* Category chips — shows all user-defined categories */}
+                        {categories.length > 0 && (
+                            <>
+                                <Text style={[formStyles.label, { color: theme.subtext, marginTop: 14 }]}>
+                                    CATEGORY
+                                </Text>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={{ gap: 8, marginBottom: 8 }}
+                                >
+                                    {categories.map(cat => {
+                                        const active = selectedCat === cat && !customCat.trim();
+                                        return (
+                                            <TouchableOpacity
+                                                key={cat}
+                                                style={[
+                                                    formStyles.categoryBtn,
+                                                    {
+                                                        backgroundColor: active ? purple : theme.inputBg,
+                                                        borderColor: active ? purple : theme.border,
+                                                    },
+                                                ]}
+                                                onPress={() => {
+                                                    setSelectedCat(active ? '' : cat);
+                                                    setCustomCat('');
+                                                }}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Text style={{ fontSize: 13, fontWeight: '600', color: active ? '#fff' : theme.subtext }}>
+                                                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
 
-                        {/* Preset chips */}
-                        <View style={formStyles.categoryRow}>
-                            {PRESET_CATEGORIES.map(cat => {
-                                const active = selectedPreset === cat && !customCat.trim();
-                                return (
-                                    <TouchableOpacity
-                                        key={cat}
+                                {/* Custom category input */}
+                                <View style={[formStyles.customCatRow, { borderColor: theme.border }]}>
+                                    <Text style={[formStyles.customCatLabel, { color: theme.placeholder }]}>
+                                        or custom:
+                                    </Text>
+                                    <TextInput
                                         style={[
-                                            formStyles.categoryBtn,
+                                            formStyles.customCatInput,
                                             {
-                                                backgroundColor: active ? purple : theme.inputBg,
-                                                borderColor: active ? purple : theme.border,
+                                                color: theme.text,
+                                                borderColor: customCat.trim() ? purple : 'transparent',
+                                                backgroundColor: theme.inputBg,
                                             },
                                         ]}
-                                        onPress={() => {
-                                            setSelectedPreset(active ? '' : cat);
-                                            setCustomCat('');
+                                        value={customCat}
+                                        onChangeText={v => {
+                                            setCustomCat(v);
+                                            if (v.trim()) setSelectedCat('');
                                         }}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text
-                                            style={{
-                                                fontSize: 13,
-                                                fontWeight: '600',
-                                                color: active ? '#fff' : theme.subtext,
-                                            }}
-                                        >
-                                            {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-
-                        {/* Custom category input */}
-                        <View style={[formStyles.customCatRow, { borderColor: theme.border }]}>
-                            <Text style={[formStyles.customCatLabel, { color: theme.placeholder }]}>
-                                or custom:
-                            </Text>
-                            <TextInput
-                                style={[
-                                    formStyles.customCatInput,
-                                    {
-                                        color: theme.text,
-                                        borderColor: customCat.trim() ? purple : 'transparent',
-                                        backgroundColor: theme.inputBg,
-                                    },
-                                ]}
-                                value={customCat}
-                                onChangeText={v => {
-                                    setCustomCat(v);
-                                    if (v.trim()) setSelectedPreset('');
-                                }}
-                                placeholder="e.g. finance, travel…"
-                                placeholderTextColor={theme.placeholder}
-                                autoCapitalize="none"
-                            />
-                        </View>
+                                        placeholder="e.g. finance, travel…"
+                                        placeholderTextColor={theme.placeholder}
+                                        autoCapitalize="none"
+                                    />
+                                </View>
+                            </>
+                        )}
 
                         {/* Notes */}
                         <Text style={[formStyles.label, { color: theme.subtext, marginTop: 14 }]}>NOTES</Text>
@@ -366,7 +414,7 @@ function EntryFormModal({ visible, editing, purple, onClose, onSaved }: EntryFor
                                     </TouchableOpacity>
                                 </View>
                                 <Text style={formStyles.masterHint}>
-                                    This is your account password — used to encrypt the entry.
+                                    Use the same master password for all entries — it cannot be recovered if forgotten.
                                 </Text>
                             </View>
                         )}
@@ -503,29 +551,37 @@ function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: Ma
 
     const createPanResponder = useCallback((index: number) => {
         return PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: () => true,
+            // Don't claim the gesture on initial touch — let taps reach buttons
+            onStartShouldSetPanResponder: () => false,
+            onStartShouldSetPanResponderCapture: () => false,
+            // Claim on clear vertical movement (> 5px) — distinguishes drag from tap
+            onMoveShouldSetPanResponder: (_evt, gs) => Math.abs(gs.dy) > 5,
+            onMoveShouldSetPanResponderCapture: (_evt, gs) => Math.abs(gs.dy) > 5,
             onPanResponderGrant: () => {
                 draggingIdxRef.current = index;
                 setDraggingIdx(index);
                 setDragTargetIdx(index);
                 dragY.setValue(0);
             },
-            onPanResponderMove: (_evt, gs) => {
-                dragY.setValue(gs.dy);
-                // Compute which slot the dragged item is hovering over
-                const target = Math.max(
-                    0,
-                    Math.min(draftRef.current.length - 1, Math.round(index + gs.dy / ITEM_H)),
-                );
-                setDragTargetIdx(target);
-            },
+            // Animated.event hooks directly into the native event loop for smooth tracking
+            onPanResponderMove: Animated.event(
+                [null, { dy: dragY }],
+                {
+                    useNativeDriver: false,
+                    listener: (_evt: any, gs: any) => {
+                        const target = Math.max(
+                            0,
+                            Math.min(draftRef.current.length - 1, Math.round(index + gs.dy / ITEM_H)),
+                        );
+                        setDragTargetIdx(target);
+                    },
+                },
+            ),
             onPanResponderRelease: (_evt, gs) => {
                 const from = draggingIdxRef.current!;
                 const moved = Math.round(gs.dy / ITEM_H);
                 const to = Math.max(0, Math.min(draftRef.current.length - 1, from + moved));
 
-                // Animate the reorder
                 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
                 if (from !== to) {
@@ -593,7 +649,6 @@ function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: Ma
 
                         {draft.map((cat, idx) => {
                             const isDragging = draggingIdx === idx;
-                            // Highlight the slot where the dragged item will land
                             const isDropTarget =
                                 dragTargetIdx === idx &&
                                 draggingIdx !== null &&
@@ -602,6 +657,9 @@ function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: Ma
                             return (
                                 <Animated.View
                                     key={cat}
+                                    // panHandlers on the entire row so any vertical swipe starts drag;
+                                    // taps still reach the ✕ button because we use onMoveShouldSetPanResponder
+                                    {...panResponders[idx]?.panHandlers}
                                     style={[
                                         catStyles.row,
                                         {
@@ -621,13 +679,8 @@ function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: Ma
                                         },
                                     ]}
                                 >
-                                    {/* Drag handle — only this area initiates the drag */}
-                                    <View
-                                        style={catStyles.dragHandle}
-                                        {...panResponders[idx]?.panHandlers}
-                                    >
-                                        <Text style={[catStyles.dragIcon, { color: theme.placeholder }]}>≡</Text>
-                                    </View>
+                                    {/* ≡ is a visual hint — dragging works anywhere on the row */}
+                                    <Text style={[catStyles.dragIcon, { color: theme.placeholder, marginRight: 12 }]}>≡</Text>
 
                                     <Text style={[catStyles.catName, { color: theme.text }]}>
                                         {cat.charAt(0).toUpperCase() + cat.slice(1)}
@@ -689,7 +742,6 @@ const catStyles = StyleSheet.create({
     listSection: { paddingHorizontal: 20, paddingBottom: 4 },
     row: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 8 },
     catName: { flex: 1, fontSize: 14, fontWeight: '600' },
-    dragHandle: { paddingRight: 14, paddingVertical: 6 },
     dragIcon: { fontSize: 22 },
     addSection: { paddingHorizontal: 20, paddingTop: 8 },
     addLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
@@ -807,7 +859,12 @@ export default function VaultScreen() {
     // ── Load / persist category order ─────────────────────────
     useEffect(() => {
         AsyncStorage.getItem(CAT_ORDER_KEY).then(val => {
-            if (val) setCategoryOrder(JSON.parse(val));
+            if (val) {
+                setCategoryOrder(JSON.parse(val));
+            } else {
+                // First run — seed with preset categories
+                setCategoryOrder([...PRESET_CATEGORIES]);
+            }
         });
     }, []);
 
@@ -820,16 +877,18 @@ export default function VaultScreen() {
 
     // ── Compute filter tags — respects stored order ───────────
     const filterTags = useMemo(() => {
+        // Tags actually used by vault entries (not auto-added presets)
         const vaultTags = new Set<string>();
         entries.forEach(e => e.tags.forEach(t => vaultTags.add(t)));
-        PRESET_CATEGORIES.forEach(p => vaultTags.add(p));
 
-        // Ordered by user preference; any unseen tags appended at the end
         const seen = new Set<string>();
         const ordered: string[] = [];
+
+        // User's explicit order first
         categoryOrder.forEach(c => {
-            if (vaultTags.has(c) && !seen.has(c)) { seen.add(c); ordered.push(c); }
+            if (!seen.has(c)) { seen.add(c); ordered.push(c); }
         });
+        // Append any entry tags not yet in the user's list (e.g. from old entries)
         vaultTags.forEach(t => {
             if (!seen.has(t)) { seen.add(t); ordered.push(t); }
         });
@@ -861,6 +920,16 @@ export default function VaultScreen() {
     useEffect(() => { fetchVault(); }, [fetchVault]);
 
     const onRefresh = () => { setRefreshing(true); fetchVault(); };
+
+    const deleteEntry = useCallback(async (entryId: string) => {
+        try {
+            await apiClient.delete(`/vault/${entryId}`);
+            fetchVault();
+        } catch (err: any) {
+            const msg = err.response?.data?.error?.message ?? err.message ?? 'Failed to delete entry.';
+            Alert.alert('Error', msg);
+        }
+    }, [fetchVault]);
 
     const filtered =
         activeTag === 'all'
@@ -942,7 +1011,7 @@ export default function VaultScreen() {
                         activeOpacity={0.8}
                         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                     >
-                        <Text style={[styles.manageBtnText, { color: theme.subtext }]}>⚙</Text>
+                        <Text style={[styles.manageBtnText, { color: theme.subtext }]}>✎</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -1053,14 +1122,16 @@ export default function VaultScreen() {
                 visible={modalVisible}
                 editing={editingEntry}
                 purple={PURPLE}
+                categories={categoryOrder}
                 onClose={() => setModalVisible(false)}
                 onSaved={fetchVault}
+                onDelete={deleteEntry}
             />
 
             {/* Manage categories modal */}
             <ManageCategoriesModal
                 visible={manageCatsVisible}
-                order={filterTags.filter(t => t !== 'all')}
+                order={categoryOrder}
                 purple={PURPLE}
                 onClose={() => setManageCatsVisible(false)}
                 onChange={saveCategoryOrder}
@@ -1172,7 +1243,7 @@ const styles = StyleSheet.create({
     chevron: { fontSize: 24, fontWeight: '300', marginLeft: 6 },
     fab: {
         position: 'absolute',
-        bottom: 90,
+        bottom: 20,
         right: 24,
         width: 56,
         height: 56,
