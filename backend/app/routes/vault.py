@@ -229,8 +229,7 @@ def get_vault_entry(entry_id):
 def update_vault_entry(entry_id):
     """
     Updates an existing vault entry. Only the owning user may update.
-    All fields optional except master_password.
-    If password is provided it is re-encrypted with the derived key.
+    master_password is only required when a new password is provided.
     """
     entry = VaultEntry.query.filter_by(entry_id=entry_id, user_id=g.user_id).first()
     if entry is None:
@@ -240,9 +239,12 @@ def update_vault_entry(entry_id):
     if not data:
         return jsonify({"error": {"code": "400", "message": "Request body must be JSON.", "details": {}}}), 400
 
-    key, err = _derive_key_from_request(data)
-    if err:
-        return err
+    # Only derive the encryption key when the password is actually being changed.
+    key = None
+    if "password" in data:
+        key, err = _derive_key_from_request(data)
+        if err:
+            return err
 
     if "title" in data:
         title = data["title"].strip()

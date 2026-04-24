@@ -7,6 +7,7 @@ import {
     StyleSheet,
     ScrollView,
     ActivityIndicator,
+    Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../lib/apiClient';
@@ -23,6 +24,7 @@ const RECENT_BREACHES = [
         severity: 'critical' as const,
         details:
             'Social Security numbers, names, addresses, and phone numbers leaked from a background-check data broker.',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/national-public-data-breach-exposes-personal-info-of-2-9-billion-people/',
     },
     {
         id: '2',
@@ -32,6 +34,7 @@ const RECENT_BREACHES = [
         severity: 'high' as const,
         details:
             'Customer names, addresses, phone numbers, partial payment card data exposed by the ShinyHunters group.',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/ticketmaster-confirms-massive-breach-after-hacker-tries-to-sell-stolen-data/',
     },
     {
         id: '3',
@@ -41,6 +44,7 @@ const RECENT_BREACHES = [
         severity: 'high' as const,
         details:
             'Call and text metadata for nearly all AT&T wireless customers exposed from a third-party cloud platform.',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/atandt-says-criminals-stole-phone-records-of-nearly-all-cellular-customers/',
     },
     {
         id: '4',
@@ -50,6 +54,7 @@ const RECENT_BREACHES = [
         severity: 'medium' as const,
         details:
             'Customer order data including names, physical addresses, and Dell hardware details posted to a hacking forum.',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/dell-warns-of-data-breach-exposing-customer-information/',
     },
     {
         id: '5',
@@ -59,6 +64,7 @@ const RECENT_BREACHES = [
         severity: 'critical' as const,
         details:
             'Largest healthcare data breach in US history. Patient records, insurance details, and medical histories exposed.',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/change-healthcare-confirms-ransomware-gang-behind-cyberattack/',
     },
     {
         id: '6',
@@ -68,6 +74,7 @@ const RECENT_BREACHES = [
         severity: 'medium' as const,
         details:
             'Email addresses scraped via public API and combined with profile data, then published on a hacking forum.',
+        articleUrl: 'https://www.bleepingcomputer.com/news/security/15-million-trello-users-have-their-data-scraped-and-shared-online/',
     },
 ];
 
@@ -95,15 +102,20 @@ export default function SecurityReportsScreen() {
     const navigation = useNavigation();
 
     const [total, setTotal] = useState<number | null>(null);
+    const [weakCount, setWeakCount] = useState<number | null>(null);
     const [statsLoading, setStatsLoading] = useState(true);
 
-    // Fetch vault entry count for the health summary
+    // Fetch vault stats for the health summary
     useEffect(() => {
         let cancelled = false;
         const load = async () => {
             try {
                 const res = await apiClient.get('/vault');
-                if (!cancelled) setTotal((res.data.entries ?? []).length);
+                const entries: any[] = res.data.entries ?? [];
+                if (!cancelled) {
+                    setTotal(entries.length);
+                    setWeakCount(entries.filter((e: any) => e.password_strength === 1).length);
+                }
             } catch {
                 // non-critical
             } finally {
@@ -152,23 +164,22 @@ export default function SecurityReportsScreen() {
                             </View>
                             <View style={[styles.healthDivider, { backgroundColor: theme.divider }]} />
                             <View style={styles.healthItem}>
+                                <Text style={[styles.healthNum, { color: '#EF4444' }]}>
+                                    {weakCount ?? '—'}
+                                </Text>
+                                <Text style={[styles.healthLabel, { color: theme.placeholder }]}>
+                                    Weak
+                                </Text>
+                            </View>
+                            <View style={[styles.healthDivider, { backgroundColor: theme.divider }]} />
+                            <View style={styles.healthItem}>
                                 <Text style={[styles.healthNum, { color: '#22C55E' }]}>✓</Text>
                                 <Text style={[styles.healthLabel, { color: theme.placeholder }]}>
                                     Encrypted
                                 </Text>
                             </View>
-                            <View style={[styles.healthDivider, { backgroundColor: theme.divider }]} />
-                            <View style={styles.healthItem}>
-                                <Text style={[styles.healthNum, { color: '#F59E0B' }]}>—</Text>
-                                <Text style={[styles.healthLabel, { color: theme.placeholder }]}>
-                                    Weak (soon)
-                                </Text>
-                            </View>
                         </View>
                     )}
-                    <Text style={[styles.healthNote, { color: theme.subtext }]}>
-                        Weak & reused password detection requires your master password and will be available in an upcoming update.
-                    </Text>
                 </View>
 
                 {/* Breach tip */}
@@ -199,9 +210,11 @@ export default function SecurityReportsScreen() {
                         : SEVERITY_BG[breach.severity];
 
                     return (
-                        <View
+                        <TouchableOpacity
                             key={breach.id}
                             style={[styles.breachCard, { backgroundColor: theme.card }]}
+                            activeOpacity={0.8}
+                            onPress={() => Linking.openURL(breach.articleUrl)}
                         >
                             {/* Top row */}
                             <View style={styles.breachTop}>
@@ -224,23 +237,33 @@ export default function SecurityReportsScreen() {
                             <Text style={[styles.breachDetails, { color: theme.subtext }]}>
                                 {breach.details}
                             </Text>
-                        </View>
+                            <Text style={[styles.readMore, { color: theme.purple }]}>
+                                Read more →
+                            </Text>
+                        </TouchableOpacity>
                     );
                 })}
 
                 {/* HIBP recommendation */}
-                <View style={[styles.card, { backgroundColor: theme.card, marginTop: 4 }]}>
+                <TouchableOpacity
+                    style={[styles.card, { backgroundColor: theme.card, marginTop: 4 }]}
+                    activeOpacity={0.8}
+                    onPress={() => Linking.openURL('https://haveibeenpwned.com')}
+                >
                     <Text style={[styles.sectionTitle, { color: theme.text }]}>
                         Check Your Email
                     </Text>
                     <Text style={[styles.hibpText, { color: theme.subtext }]}>
-                        Visit{' '}
+                        Tap to visit{' '}
                         <Text style={{ color: theme.purple, fontWeight: '700' }}>
                             haveibeenpwned.com
                         </Text>
-                        {' '}to check if any of your email addresses have appeared in a known data breach.
+                        {' '}and check if any of your email addresses have appeared in a known data breach.
                     </Text>
-                </View>
+                    <Text style={[styles.readMore, { color: theme.purple, marginTop: 8 }]}>
+                        Open haveibeenpwned.com →
+                    </Text>
+                </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );
@@ -371,5 +394,10 @@ const styles = StyleSheet.create({
     hibpText: {
         fontSize: 14,
         lineHeight: 20,
+    },
+    readMore: {
+        fontSize: 12,
+        fontWeight: '700',
+        marginTop: 6,
     },
 });
