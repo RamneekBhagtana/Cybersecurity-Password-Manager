@@ -1,179 +1,223 @@
-import { useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
-    ScrollView,
     FlatList,
+    ActivityIndicator,
+    Alert,
+    RefreshControl,
 } from 'react-native';
+import apiClient from '../lib/apiClient';
 
+// ── Types ─────────────────────────────────────────────────────────
 type VaultEntry = {
-    id: string;
+    entry_id: string;
     title: string;
-    username: string;
-    tag: string;
-    tagColor: string;
-    initial: string;
-    iconBg: string;
-    strength: 'strong' | 'medium' | 'weak';
+    username: string | null;
+    url: string | null;
+    tags: string[];
+    created_at: string | null;
+    updated_at: string | null;
 };
 
-const MOCK_ENTRIES: VaultEntry[] = [
-    {
-        id: '1',
-        title: 'GitHub',
-        username: 'marcelo.tsx',
-        tag: 'work',
-        tagColor: '#6C63FF',
-        initial: 'G',
-        iconBg: '#1a1a2e',
-        strength: 'strong',
-    },
-    {
-        id: '2',
-        title: 'Gmail',
-        username: 'jenna.k@gmail.com',
-        tag: 'personal',
-        tagColor: '#6C63FF',
-        initial: 'G',
-        iconBg: '#EA4335',
-        strength: 'strong',
-    },
-    {
-        id: '3',
-        title: 'Netflix',
-        username: 'liwei_watches',
-        tag: 'entertainment',
-        tagColor: '#6C63FF',
-        initial: 'N',
-        iconBg: '#E50914',
-        strength: 'medium',
-    },
-    {
-        id: '4',
-        title: 'AWS Console',
-        username: 'ops@revsolve.io',
-        tag: 'work',
-        tagColor: '#6C63FF',
-        initial: 'A',
-        iconBg: '#FF9900',
-        strength: 'strong',
-    },
-    {
-        id: '5',
-        title: 'Instagram',
-        username: 'sierra.creative',
-        tag: 'personal',
-        tagColor: '#6C63FF',
-        initial: 'I',
-        iconBg: '#C13584',
-        strength: 'weak',
-    },
-];
+// ── Constants ─────────────────────────────────────────────────────
+const PURPLE = '#6C63FF';
+const BG = '#F0F2F8';
 
 const TAGS = ['all', 'work', 'personal', 'school'];
 
-const strengthDot: Record<string, string> = {
-    strong: '#22C55E',
-    medium: '#F59E0B',
-    weak: '#EF4444',
-};
+// Consistent icon color palette keyed off the first character of the title
+const ICON_COLORS = [
+    '#1a1a2e',
+    '#EA4335',
+    '#E50914',
+    '#FF9900',
+    '#C13584',
+    '#0F9D58',
+    '#4285F4',
+    '#6C63FF',
+];
 
+function getIconStyle(title: string): { initial: string; bg: string } {
+    if (!title) return { initial: '?', bg: '#888' };
+    const idx = title.toUpperCase().charCodeAt(0) % ICON_COLORS.length;
+    return {
+        initial: title.charAt(0).toUpperCase(),
+        bg: ICON_COLORS[idx],
+    };
+}
+
+// ─────────────────────────────────────────────────────────────────
 export default function VaultScreen() {
+    const [entries, setEntries] = useState<VaultEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [activeTag, setActiveTag] = useState('all');
 
+    // ── Fetch vault entries from backend ──────────────────────
+    const fetchVault = useCallback(async () => {
+        try {
+            const res = await apiClient.get('/vault');
+            setEntries(res.data.entries ?? []);
+        } catch (err: any) {
+            // Skip auth-abort errors silently - user isn't signed in yet
+            if (err.message?.includes('No active session')) {
+                setLoading(false);
+                return;
+            }
+            const msg =
+                err.response?.data?.error?.message ??
+                err.message ??
+                'Failed to load vault entries.';
+            Alert.alert('Error', msg);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchVault();
+    }, [fetchVault]);
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchVault();
+    };
+
+    // ── Filter entries by active tag ──────────────────────────
     const filtered =
         activeTag === 'all'
-            ? MOCK_ENTRIES
-            : MOCK_ENTRIES.filter((e) => e.tag === activeTag);
+            ? entries
+            : entries.filter((e) => e.tags.includes(activeTag));
 
+    // ── Loading state ─────────────────────────────────────────
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.safe}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={PURPLE} />
+                    <Text style={styles.loadingText}>Loading your vault...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // ── Main render ───────────────────────────────────────────
     return (
         <SafeAreaView style={styles.safe}>
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>My Vault</Text>
-                <View style={styles.headerIcons}>
-                    <TouchableOpacity style={styles.iconBtn}>
-                        <Text style={styles.iconText}>☾</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconBtn}>
-                        <Text style={styles.iconText}>🔍</Text>
-                    </TouchableOpacity>
+                <View>
+                    <Text style={styles.headerTitle}>My Vault</Text>
+                    <Text style={styles.entryCount}>{filtered.length} items</Text>
                 </View>
             </View>
 
             {/* Tag Filter */}
-            <ScrollView
+            <FlatList
+                data={TAGS}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                style={styles.tagScroll}
-                contentContainerStyle={styles.tagContainer}
-            >
-                {TAGS.map((tag) => (
+                keyExtractor={(t) => t}
+                contentContainerStyle={styles.tagList}
+                renderItem={({ item }) => (
                     <TouchableOpacity
-                        key={tag}
-                        style={[styles.tagPill, activeTag === tag && styles.tagPillActive]}
-                        onPress={() => setActiveTag(tag)}
+                        style={[styles.tag, activeTag === item && styles.tagActive]}
+                        onPress={() => setActiveTag(item)}
+                        activeOpacity={0.8}
                     >
                         <Text
-                            style={[styles.tagText, activeTag === tag && styles.tagTextActive]}
+                            style={[
+                                styles.tagText,
+                                activeTag === item && styles.tagTextActive,
+                            ]}
                         >
-                            {tag}
+                            {item.charAt(0).toUpperCase() + item.slice(1)}
                         </Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
-
-            {/* Entry Count */}
-            <Text style={styles.entryCount}>
-                Showing {filtered.length} of {MOCK_ENTRIES.length} entries
-            </Text>
-
-            {/* Vault List */}
-            <FlatList
-                data={filtered}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.listContainer}
-                renderItem={({ item }) => (
-                    <TouchableOpacity style={styles.entryCard}>
-                        <View style={[styles.entryIcon, { backgroundColor: item.iconBg }]}>
-                            <Text style={styles.entryInitial}>{item.initial}</Text>
-                        </View>
-                        <View style={styles.entryInfo}>
-                            <View style={styles.entryTitleRow}>
-                                <Text style={styles.entryTitle}>{item.title}</Text>
-                                <View
-                                    style={[
-                                        styles.strengthDot,
-                                        { backgroundColor: strengthDot[item.strength] },
-                                    ]}
-                                />
-                            </View>
-                            <Text style={styles.entryUsername}>{item.username}</Text>
-                            <Text style={styles.entryTag}>{item.tag}</Text>
-                        </View>
-                        <Text style={styles.chevron}>›</Text>
                     </TouchableOpacity>
                 )}
             />
 
-            {/* FAB */}
-            <TouchableOpacity style={styles.fab}>
+            {/* Entries List */}
+            <FlatList
+                data={filtered}
+                keyExtractor={(e) => e.entry_id}
+                contentContainerStyle={styles.list}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={PURPLE}
+                    />
+                }
+                ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyIcon}>🔐</Text>
+                        <Text style={styles.emptyTitle}>No entries yet</Text>
+                        <Text style={styles.emptySubtitle}>
+                            Tap the + button to add your first password.
+                        </Text>
+                    </View>
+                }
+                renderItem={({ item }) => {
+                    const { initial, bg } = getIconStyle(item.title);
+                    return (
+                        <TouchableOpacity style={styles.entryCard} activeOpacity={0.85}>
+                            <View style={[styles.entryIcon, { backgroundColor: bg }]}>
+                                <Text style={styles.entryInitial}>{initial}</Text>
+                            </View>
+                            <View style={styles.entryInfo}>
+                                <Text style={styles.entryTitle} numberOfLines={1}>
+                                    {item.title}
+                                </Text>
+                                {item.username && (
+                                    <Text style={styles.entryUsername} numberOfLines={1}>
+                                        {item.username}
+                                    </Text>
+                                )}
+                                {item.tags.length > 0 && (
+                                    <Text style={styles.entryTag}>{item.tags[0]}</Text>
+                                )}
+                            </View>
+                            <Text style={styles.chevron}>›</Text>
+                        </TouchableOpacity>
+                    );
+                }}
+            />
+
+            {/* FAB - Add New Entry */}
+            <TouchableOpacity
+                style={styles.fab}
+                activeOpacity={0.85}
+                onPress={() =>
+                    Alert.alert('Coming Soon', 'Add/Edit form will be available in Task 29.')
+                }
+            >
                 <Text style={styles.fabIcon}>+</Text>
             </TouchableOpacity>
         </SafeAreaView>
     );
 }
 
-const PURPLE = '#6C63FF';
-const BG = '#F0F2F8';
-
+// ── Styles ────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
     safe: {
         flex: 1,
         backgroundColor: BG,
+    },
+    loadingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: 12,
+        color: '#888',
+        fontSize: 14,
     },
     header: {
         flexDirection: 'row',
@@ -188,35 +232,28 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#1a1a2e',
     },
-    headerIcons: {
-        flexDirection: 'row',
+    entryCount: {
+        fontSize: 13,
+        color: '#888',
+        marginTop: 2,
+    },
+    tagList: {
+        paddingHorizontal: 20,
+        paddingBottom: 12,
         gap: 8,
     },
-    iconBtn: {
-        padding: 6,
-    },
-    iconText: {
-        fontSize: 18,
-        color: '#555',
-    },
-    tagScroll: {
-        paddingLeft: 20,
-        marginBottom: 4,
-    },
-    tagContainer: {
-        flexDirection: 'row',
-        gap: 8,
-        paddingRight: 20,
-        paddingVertical: 8,
-    },
-    tagPill: {
-        paddingHorizontal: 16,
-        paddingVertical: 6,
+    tag: {
+        paddingHorizontal: 14,
+        paddingVertical: 7,
         borderRadius: 20,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: '#fff',
+        borderWidth: 1.5,
+        borderColor: '#E5E7EB',
+        marginRight: 8,
     },
-    tagPillActive: {
+    tagActive: {
         backgroundColor: PURPLE,
+        borderColor: PURPLE,
     },
     tagText: {
         fontSize: 13,
@@ -226,16 +263,31 @@ const styles = StyleSheet.create({
     tagTextActive: {
         color: '#fff',
     },
-    entryCount: {
-        fontSize: 13,
-        color: '#888',
-        paddingHorizontal: 20,
-        marginBottom: 8,
-    },
-    listContainer: {
+    list: {
         paddingHorizontal: 20,
         paddingBottom: 100,
-        gap: 8,
+        flexGrow: 1,
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 80,
+    },
+    emptyIcon: {
+        fontSize: 48,
+        marginBottom: 16,
+    },
+    emptyTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#1a1a2e',
+        marginBottom: 6,
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: '#888',
+        textAlign: 'center',
+        paddingHorizontal: 40,
     },
     entryCard: {
         backgroundColor: '#fff',
@@ -244,6 +296,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 14,
         paddingHorizontal: 14,
+        marginBottom: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
     },
     entryIcon: {
         width: 42,
@@ -261,20 +319,10 @@ const styles = StyleSheet.create({
     entryInfo: {
         flex: 1,
     },
-    entryTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
     entryTitle: {
         fontSize: 15,
         fontWeight: '700',
         color: '#1a1a2e',
-    },
-    strengthDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
     },
     entryUsername: {
         fontSize: 13,
@@ -288,17 +336,18 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     chevron: {
-        fontSize: 20,
+        fontSize: 24,
         color: '#ccc',
         fontWeight: '300',
+        marginLeft: 6,
     },
     fab: {
         position: 'absolute',
         bottom: 90,
         right: 24,
-        width: 52,
-        height: 52,
-        borderRadius: 16,
+        width: 56,
+        height: 56,
+        borderRadius: 18,
         backgroundColor: PURPLE,
         alignItems: 'center',
         justifyContent: 'center',

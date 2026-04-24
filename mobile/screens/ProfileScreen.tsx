@@ -1,25 +1,41 @@
-import { useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState, useEffect } from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     ScrollView,
     Switch,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../hooks/useSession';
+import apiClient from '../lib/apiClient';
 
+// ── Constants ─────────────────────────────────────────────────────
+const PURPLE = '#6C63FF';
+const BG = '#F0F2F8';
+
+// ── Types ─────────────────────────────────────────────────────────
+type VaultStats = {
+    total: number;
+    weak: number;
+    reused: number;
+};
+
+// ─────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
     const { session } = useSession();
     const [darkMode, setDarkMode] = useState(false);
+    const [stats, setStats] = useState<VaultStats>({ total: 0, weak: 0, reused: 0 });
+    const [statsLoading, setStatsLoading] = useState(true);
 
     const email = session?.user?.email ?? 'user@email.com';
     const initial = email.charAt(0).toUpperCase();
 
-    // Format join date from session metadata or fallback
+    // Format join date
     const createdAt = session?.user?.created_at
         ? new Date(session.user.created_at).toLocaleDateString('en-US', {
               month: 'short',
@@ -27,6 +43,40 @@ export default function ProfileScreen() {
           })
         : 'Mar 2026';
 
+    // ── Fetch vault stats from backend ────────────────────────
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchStats = async () => {
+            try {
+                const res = await apiClient.get('/vault');
+                if (cancelled) return;
+
+                const entries: any[] = res.data.entries ?? [];
+
+                // Note: weak/reused detection requires master_password decryption
+                // which happens in the Security Reports feature (Task 19).
+                // For now, we show total count only and leave weak/reused at 0.
+                setStats({
+                    total: entries.length,
+                    weak: 0,
+                    reused: 0,
+                });
+            } catch (err) {
+                // Silently fail - stats are not critical
+                console.warn('Failed to load vault stats:', err);
+            } finally {
+                if (!cancelled) setStatsLoading(false);
+            }
+        };
+
+        fetchStats();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    // ── Sign out with SecureStore cleanup ─────────────────────
     const handleSignOut = async () => {
         Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
             { text: 'Cancel', style: 'cancel' },
@@ -34,33 +84,48 @@ export default function ProfileScreen() {
                 text: 'Sign Out',
                 style: 'destructive',
                 onPress: async () => {
+                    // Sign out from Supabase (triggers auth state listener in App.tsx)
                     await supabase.auth.signOut();
                 },
             },
         ]);
     };
 
+    // ── Menu items ────────────────────────────────────────────
     const menuItems = [
         {
+            icon: '🔑',
             title: 'Change Password',
             subtitle: 'Update your master password',
-            onPress: () => Alert.alert('Coming Soon', 'This feature will be available soon.'),
+            onPress: () =>
+                Alert.alert('Coming Soon', 'This feature will be available soon.'),
         },
         {
+            icon: '📊',
             title: 'Security Reports',
             subtitle: 'View weak & reused passwords',
-            onPress: () => Alert.alert('Coming Soon', 'This feature will be available soon.'),
+            onPress: () =>
+                Alert.alert('Coming Soon', 'This feature will be available soon.'),
         },
         {
+            icon: 'ℹ️',
             title: 'About',
             subtitle: 'SecureVault v1.0',
-            onPress: () => {},
+            onPress: () =>
+                Alert.alert(
+                    'SecureVault v1.0',
+                    'A secure password manager built with Flask, PostgreSQL, Supabase, and React Native.'
+                ),
         },
     ];
 
+    // ── Render ────────────────────────────────────────────────
     return (
         <SafeAreaView style={styles.safe}>
-            <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={styles.container}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Header */}
                 <Text style={styles.headerTitle}>Profile</Text>
 
@@ -69,22 +134,40 @@ export default function ProfileScreen() {
                     <View style={styles.avatar}>
                         <Text style={styles.avatarText}>{initial}</Text>
                     </View>
-                    <Text style={styles.userEmail}>{email}</Text>
+                    <Text style={styles.userEmail} numberOfLines={1}>
+                        {email}
+                    </Text>
                     <Text style={styles.memberSince}>Member since {createdAt}</Text>
                 </View>
 
                 {/* Stats Row */}
                 <View style={styles.statsRow}>
                     <View style={styles.statCard}>
-                        <Text style={styles.statNumber}>6</Text>
+                        {statsLoading ? (
+                            <ActivityIndicator color={PURPLE} size="small" />
+                        ) : (
+                            <Text style={styles.statNumber}>{stats.total}</Text>
+                        )}
                         <Text style={styles.statLabel}>Total</Text>
                     </View>
                     <View style={styles.statCard}>
-                        <Text style={[styles.statNumber, { color: '#EF4444' }]}>1</Text>
+                        {statsLoading ? (
+                            <ActivityIndicator color="#EF4444" size="small" />
+                        ) : (
+                            <Text style={[styles.statNumber, { color: '#EF4444' }]}>
+                                {stats.weak}
+                            </Text>
+                        )}
                         <Text style={styles.statLabel}>Weak</Text>
                     </View>
                     <View style={styles.statCard}>
-                        <Text style={[styles.statNumber, { color: '#22C55E' }]}>0</Text>
+                        {statsLoading ? (
+                            <ActivityIndicator color="#22C55E" size="small" />
+                        ) : (
+                            <Text style={[styles.statNumber, { color: '#22C55E' }]}>
+                                {stats.reused}
+                            </Text>
+                        )}
                         <Text style={styles.statLabel}>Reused</Text>
                     </View>
                 </View>
@@ -92,44 +175,51 @@ export default function ProfileScreen() {
                 {/* Dark Mode Toggle */}
                 <View style={styles.toggleCard}>
                     <View style={styles.toggleLeft}>
-                        <Text style={styles.toggleIcon}>☀️</Text>
+                        <Text style={styles.toggleIcon}>{darkMode ? '🌙' : '☀️'}</Text>
                         <View>
-                            <Text style={styles.toggleTitle}>Light Mode</Text>
+                            <Text style={styles.toggleTitle}>
+                                {darkMode ? 'Dark Mode' : 'Light Mode'}
+                            </Text>
                             <Text style={styles.toggleSubtitle}>
-                                {darkMode ? 'Tap to switch to light' : 'Tap to switch to dark'}
+                                {darkMode ? 'Easier on the eyes' : 'Bright and clean'}
                             </Text>
                         </View>
                     </View>
                     <Switch
                         value={darkMode}
                         onValueChange={setDarkMode}
-                        trackColor={{ false: '#E5E7EB', true: '#6C63FF' }}
+                        trackColor={{ false: '#D1D5DB', true: PURPLE }}
                         thumbColor="#fff"
                     />
                 </View>
 
                 {/* Menu Items */}
                 <View style={styles.menuCard}>
-                    {menuItems.map((item, index) => (
-                        <TouchableOpacity
-                            key={item.title}
-                            style={[
-                                styles.menuItem,
-                                index < menuItems.length - 1 && styles.menuItemBorder,
-                            ]}
-                            onPress={item.onPress}
-                        >
-                            <View style={styles.menuItemText}>
-                                <Text style={styles.menuTitle}>{item.title}</Text>
-                                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-                            </View>
-                            <Text style={styles.menuChevron}>›</Text>
-                        </TouchableOpacity>
+                    {menuItems.map((item, idx) => (
+                        <View key={item.title}>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={item.onPress}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.menuIcon}>{item.icon}</Text>
+                                <View style={styles.menuTextContainer}>
+                                    <Text style={styles.menuTitle}>{item.title}</Text>
+                                    <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                                </View>
+                                <Text style={styles.menuChevron}>›</Text>
+                            </TouchableOpacity>
+                            {idx < menuItems.length - 1 && <View style={styles.divider} />}
+                        </View>
                     ))}
                 </View>
 
                 {/* Sign Out */}
-                <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
+                <TouchableOpacity
+                    style={styles.signOutBtn}
+                    onPress={handleSignOut}
+                    activeOpacity={0.85}
+                >
                     <Text style={styles.signOutText}>Sign Out</Text>
                 </TouchableOpacity>
             </ScrollView>
@@ -137,17 +227,14 @@ export default function ProfileScreen() {
     );
 }
 
-const BG = '#F0F2F8';
-const PURPLE = '#6C63FF';
-
+// ── Styles ────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
     safe: {
         flex: 1,
         backgroundColor: BG,
     },
     container: {
-        paddingHorizontal: 20,
-        paddingTop: 16,
+        padding: 20,
         paddingBottom: 100,
     },
     headerTitle: {
@@ -159,22 +246,32 @@ const styles = StyleSheet.create({
     userCard: {
         backgroundColor: '#fff',
         borderRadius: 16,
-        padding: 20,
+        padding: 24,
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
     },
     avatar: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 72,
+        height: 72,
+        borderRadius: 24,
         backgroundColor: PURPLE,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 10,
+        marginBottom: 12,
+        shadowColor: PURPLE,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 6,
     },
     avatarText: {
         color: '#fff',
-        fontSize: 26,
+        fontSize: 32,
         fontWeight: '800',
     },
     userEmail: {
@@ -190,33 +287,39 @@ const styles = StyleSheet.create({
     statsRow: {
         flexDirection: 'row',
         gap: 10,
-        marginBottom: 12,
+        marginBottom: 16,
     },
     statCard: {
         flex: 1,
         backgroundColor: '#fff',
         borderRadius: 12,
-        paddingVertical: 14,
+        paddingVertical: 18,
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 4,
+        elevation: 1,
     },
     statNumber: {
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: '800',
         color: '#1a1a2e',
+        marginBottom: 2,
     },
     statLabel: {
         fontSize: 12,
         color: '#888',
-        marginTop: 2,
+        fontWeight: '600',
     },
     toggleCard: {
         backgroundColor: '#fff',
         borderRadius: 12,
         padding: 16,
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 12,
+        alignItems: 'center',
+        marginBottom: 16,
     },
     toggleLeft: {
         flexDirection: 'row',
@@ -228,7 +331,7 @@ const styles = StyleSheet.create({
     },
     toggleTitle: {
         fontSize: 15,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#1a1a2e',
     },
     toggleSubtitle: {
@@ -245,20 +348,19 @@ const styles = StyleSheet.create({
     menuItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 16,
+        paddingVertical: 14,
         paddingHorizontal: 16,
     },
-    menuItemBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+    menuIcon: {
+        fontSize: 22,
+        marginRight: 14,
     },
-    menuItemText: {
+    menuTextContainer: {
         flex: 1,
     },
     menuTitle: {
         fontSize: 15,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#1a1a2e',
     },
     menuSubtitle: {
@@ -267,18 +369,26 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     menuChevron: {
-        fontSize: 20,
+        fontSize: 22,
         color: '#ccc',
+        fontWeight: '300',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#F0F2F8',
+        marginLeft: 52,
     },
     signOutBtn: {
-        backgroundColor: '#FEE2E2',
+        backgroundColor: '#fff',
         borderRadius: 12,
-        paddingVertical: 16,
+        paddingVertical: 15,
         alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#EF4444',
     },
     signOutText: {
         color: '#EF4444',
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '700',
     },
 });
