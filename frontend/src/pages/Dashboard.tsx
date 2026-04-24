@@ -1,201 +1,138 @@
-import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
-import Card from "../components/ui/Card";
-import VaultEntryCard from "../components/VaultEntryCard";
-import VaultFilters from "../components/VaultFilters";
+import { Link, useLocation } from "react-router-dom";
 import { useVaultEntries } from "../hooks/useVaultEntries";
-import { filterVaultEntries, getUniqueTags } from "../utils/vaultFilters";
+import VaultEntryCard from "../components/VaultEntryCard";
+import { useEffect, useState, useMemo } from "react";
 
 export default function Dashboard() {
-  const { entries, loading, error, reload, removeEntry } = useVaultEntries();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const { entries = [], loading, reload } = useVaultEntries();
+  const location = useLocation();
 
-  const tags = useMemo(() => getUniqueTags(entries), [entries]);
+  // 🔥 reload when coming back to dashboard
+  useEffect(() => {
+    reload();
+  }, [location.pathname]);
 
-  const filteredEntries = useMemo(
-    () => filterVaultEntries(entries, searchTerm, selectedTags),
-    [entries, searchTerm, selectedTags]
-  );
+  const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState("All");
 
-  const stats = [
-    { label: "Saved passwords", value: String(entries.length) },
-    { label: "Strong passwords", value: "18" },
-    { label: "Security score", value: "92%" },
-  ];
+  const filteredEntries = useMemo(() => {
+    return entries.filter((entry: any) => {
+      const matchesSearch =
+        entry.siteName?.toLowerCase().includes(search.toLowerCase()) ||
+        entry.username?.toLowerCase().includes(search.toLowerCase());
 
-  const toggleTag = (tag: string) => {
-    if (tag === "All") return setSelectedTags([]);
+      const matchesFilter =
+        activeFilter === "All" ||
+        entry.tag?.toLowerCase() === activeFilter.toLowerCase();
 
-    setSelectedTags((prev) =>
-      prev.includes(tag)
-        ? prev.filter((item) => item !== tag)
-        : [...prev, tag]
-    );
-  };
+      return matchesSearch && matchesFilter;
+    });
+  }, [entries, search, activeFilter]);
 
-  const clearFilters = () => {
-    setSearchTerm("");
-    setSelectedTags([]);
-  };
-
-  const noMatches =
-    !loading && !error && filteredEntries.length === 0 && entries.length > 0;
+  const strongPasswords = entries.filter(
+    (e: any) => e.password?.length >= 12
+  ).length;
 
   return (
     <AppLayout>
       <div className="space-y-6">
 
         {/* HEADER */}
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
-            Overview
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-[var(--text)]">
-            Dashboard
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
+        <div className="rounded-[28px] p-6 shadow-md bg-white dark:bg-[var(--surface-2)]">
+          <p className="text-xs uppercase text-[var(--muted)]">Overview</p>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="mt-2 text-sm text-[var(--muted)]">
             Track your vault activity, search credentials quickly, and manage your saved entries.
           </p>
-        </Card>
-
-        {/* LOADING / ERROR */}
-        {loading && (
-          <Card>Loading vault...</Card>
-        )}
-
-        {error && (
-          <Card>
-            <p className="text-sm font-medium text-[var(--danger)]">{error}</p>
-            <button
-              onClick={reload}
-              className="mt-2 text-sm font-semibold text-[var(--primary)] hover:underline"
-            >
-              Try again
-            </button>
-          </Card>
-        )}
+        </div>
 
         {/* STATS */}
         <div className="grid gap-4 md:grid-cols-3">
-          {stats.map((item) => (
-            <Card key={item.label}>
-              <p className="text-sm text-[var(--muted)]">{item.label}</p>
-              <p className="mt-2 text-3xl font-bold text-[var(--text)]">
-                {item.value}
-              </p>
-            </Card>
-          ))}
+          <div className="rounded-[28px] p-6 shadow-md bg-white dark:bg-[var(--surface-2)]">
+            <p className="text-sm text-[var(--muted)]">Saved passwords</p>
+            <p className="mt-2 text-3xl font-bold">{entries.length}</p>
+          </div>
+
+          <div className="rounded-[28px] p-6 shadow-md bg-white dark:bg-[var(--surface-2)]">
+            <p className="text-sm text-[var(--muted)]">Strong passwords</p>
+            <p className="mt-2 text-3xl font-bold">{strongPasswords}</p>
+          </div>
+
+          <div className="rounded-[28px] p-6 shadow-md bg-white dark:bg-[var(--surface-2)]">
+            <p className="text-sm text-[var(--muted)]">Security score</p>
+            <p className="mt-2 text-3xl font-bold">
+              {Math.max(0, 100 - entries.length * 2)}%
+            </p>
+          </div>
         </div>
 
-        {/* FILTERS */}
-        <VaultFilters
-          searchTerm={searchTerm}
-          onSearchTermChange={setSearchTerm}
-          tags={tags}
-          selectedTags={selectedTags}
-          onToggleTag={toggleTag}
-          onClearFilters={clearFilters}
-          filteredCount={filteredEntries.length}
-          totalCount={entries.length}
-        />
+        {/* SEARCH */}
+        <div className="rounded-[28px] p-6 shadow-md bg-white dark:bg-[var(--surface-2)] space-y-4">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by site name or username"
+            className="w-full p-3 rounded-xl bg-[var(--surface-1)] border border-[var(--border)]"
+          />
+        </div>
 
-        {/* MAIN GRID */}
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        {/* VAULT + ACTIONS */}
+        <div className="grid gap-6 md:grid-cols-2">
 
-          {/* VAULT */}
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-[var(--text)]">
-                  Vault entries
-                </h2>
-                <p className="text-sm text-[var(--muted)]">
-                  Your saved passwords at a glance.
-                </p>
-              </div>
-
-              <Link
-                to="/vault"
-                className="text-sm font-semibold text-[var(--primary)] hover:underline"
-              >
+          {/* VAULT ENTRIES */}
+          <div className="rounded-[28px] p-6 shadow-md bg-white dark:bg-[var(--surface-2)] space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="font-bold">Vault entries</h2>
+              <Link to="/vault" className="text-sm text-[var(--primary)]">
                 View all
               </Link>
             </div>
 
-            <div className="mt-4 space-y-3">
-              {noMatches ? (
-                <div className="rounded-xl bg-[var(--surface-2)] p-4">
-                  <p className="text-sm text-[var(--text)]">
-                    No passwords match your filters.
-                  </p>
-                  <p className="text-sm text-[var(--muted)]">
-                    Try clearing filters.
-                  </p>
-                </div>
-              ) : filteredEntries.length === 0 ? (
-                <div className="rounded-xl bg-[var(--surface-2)] p-4 text-sm text-[var(--muted)]">
-                  No passwords saved yet.
-                </div>
-              ) : (
-                filteredEntries.slice(0, 2).map((entry) => (
-                  <VaultEntryCard
-                    key={entry.id}
-                    entry={entry}
-                    onDeleted={removeEntry}
-                    onEdit={(item) => console.log("edit", item)}
-                  />
-                ))
-              )}
+            {loading && (
+              <p className="text-sm text-[var(--muted)]">Loading...</p>
+            )}
+
+            {!loading && filteredEntries.length === 0 && (
+              <p className="text-sm text-[var(--muted)]">
+                No entries found.
+              </p>
+            )}
+
+            <div className="space-y-3">
+              {!loading &&
+                filteredEntries.slice(0, 5).map((entry: any) => (
+                  <VaultEntryCard key={entry.id} entry={entry} />
+                ))}
             </div>
-          </Card>
-
-          {/* ACTIONS */}
-          <Card>
-            <h2 className="text-xl font-bold text-[var(--text)] mb-3">
-              Quick actions
-            </h2>
-
-            <div className="space-y-2">
-              <Link
-                to="/vault"
-                className="block rounded-xl bg-[var(--surface-2)] px-4 py-3 text-sm hover:bg-[var(--surface-3)] transition"
-              >
-                Open Vault
-              </Link>
-
-              <Link
-                to="/generator"
-                className="block rounded-xl bg-[var(--surface-2)] px-4 py-3 text-sm hover:bg-[var(--surface-3)] transition"
-              >
-                Generate Password
-              </Link>
-
-              <Link
-                to="/profile"
-                className="block rounded-xl bg-[var(--surface-2)] px-4 py-3 text-sm hover:bg-[var(--surface-3)] transition"
-              >
-                Profile Settings
-              </Link>
-            </div>
-          </Card>
-        </div>
-
-        {/* SECURITY */}
-        <Card>
-          <h2 className="text-xl font-bold text-[var(--text)]">
-            Security status
-          </h2>
-
-          <div className="mt-4 rounded-xl bg-[var(--surface-2)] p-4">
-            <p className="text-sm text-[var(--muted)]">Overall score</p>
-            <p className="text-4xl font-bold text-[var(--primary)]">92%</p>
-            <p className="text-sm text-[var(--muted)] mt-2">
-              Your vault is in good shape.
-            </p>
           </div>
-        </Card>
+
+          {/* QUICK ACTIONS */}
+          <div className="rounded-[28px] p-6 shadow-md bg-white dark:bg-[var(--surface-2)] space-y-3">
+            <Link
+              to="/vault"
+              className="block p-3 rounded-xl bg-[var(--surface-1)] border border-[var(--border)] hover:bg-[var(--surface-2)] transition shadow-sm hover:shadow-md"
+            >
+              Open Vault
+            </Link>
+
+            <Link
+              to="/generator"
+              className="block p-3 rounded-xl bg-[var(--surface-1)] border border-[var(--border)] hover:bg-[var(--surface-2)] transition shadow-sm hover:shadow-md"
+            >
+              Generate Password
+            </Link>
+
+            <Link
+              to="/profile"
+              className="block p-3 rounded-xl bg-[var(--surface-1)] border border-[var(--border)] hover:bg-[var(--surface-2)] transition shadow-sm hover:shadow-md"
+            >
+              Profile Settings
+            </Link>
+          </div>
+
+        </div>
 
       </div>
     </AppLayout>

@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { MOCK_VAULT_ENTRIES } from "../data/mockVaultEntries";
-import { deleteVaultEntry, fetchVaultEntries } from "../services/vault";
-import type { VaultEntry } from "../types/vault";
-
-type Source = "api" | "mock";
+import { fetchVaultEntries, deleteVaultEntry } from "../services/vault";
 
 export function useVaultEntries() {
-  const [entries, setEntries] = useState<VaultEntry[]>([]);
+  const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [source, setSource] = useState<Source>("api");
 
   const loadEntries = useCallback(async () => {
     setLoading(true);
@@ -17,37 +12,31 @@ export function useVaultEntries() {
 
     try {
       const data = await fetchVaultEntries();
-      setEntries(data);
-      setSource("api");
-    } catch {
-      setEntries(MOCK_VAULT_ENTRIES);
-      setSource("mock");
-      setError("Could not load vault entries right now. Showing sample data.");
+
+      console.log("HOOK DATA:", data); // 🔥 DEBUG
+
+      setEntries(data || []);
+    } catch (err) {
+      console.error("Vault load failed:", err);
+      setEntries([]);
+      setError("Failed to load vault entries.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadEntries();
+    loadEntries();
   }, [loadEntries]);
 
-  const removeEntry = useCallback(
-    async (id: string) => {
-      if (source === "mock") {
-        setEntries((prev) => prev.filter((entry) => entry.id !== id));
-        return;
-      }
-
-      try {
-        await deleteVaultEntry(id);
-        setEntries((prev) => prev.filter((entry) => entry.id !== id));
-      } catch {
-        setError("Could not delete that entry on the server. Please try again.");
-      }
-    },
-    [source]
-  );
+  const removeEntry = async (id: string) => {
+    try {
+      await deleteVaultEntry(id);
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+    } catch (err) {
+      console.error("Delete failed:", err);
+    }
+  };
 
   return {
     entries,

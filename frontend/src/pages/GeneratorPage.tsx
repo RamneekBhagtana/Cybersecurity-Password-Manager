@@ -6,7 +6,7 @@ export default function GeneratorPage() {
     <AppLayout>
       <div className="space-y-6 max-w-3xl mx-auto px-4">
 
-        {/* Header */}
+        {/* HEADER */}
         <div>
           <h1 className="text-3xl font-bold">Generator</h1>
           <p className="text-[var(--muted)] mt-1">
@@ -14,8 +14,10 @@ export default function GeneratorPage() {
           </p>
         </div>
 
-        {/* Generator */}
-        <Generator />
+        {/* GENERATOR CARD */}
+        <div className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-6 shadow-md">
+          <Generator />
+        </div>
 
       </div>
     </AppLayout>
