@@ -1,47 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AppLayout from "../layouts/AppLayout";
 import Button from "../components/ui/Button";
 import VaultEntryCard from "../components/VaultEntryCard";
 import type { VaultEntry } from "../types/vault";
-
-const initialItems: VaultEntry[] = [
-  {
-    id: "1",
-    siteName: "Netflix",
-    website: "netflix.com",
-    username: "adrita@email.com",
-    password: "netflix-password-123",
-    tag: "Personal",
-  },
-  {
-    id: "2",
-    siteName: "GitHub",
-    website: "github.com",
-    username: "adrita.dev",
-    password: "github-password-123",
-    tag: "Work",
-  },
-  {
-    id: "3",
-    siteName: "Notion",
-    website: "notion.com",
-    username: "adrita.study",
-    password: "notion-password-123",
-    tag: "School",
-  },
-  {
-    id: "4",
-    siteName: "Discord",
-    website: "Discord.com",
-    username: "adrita#2048",
-    password: "discord-password-123",
-    tag: "Personal",
-  },
-];
+import VaultForm from "../components/VaultForm"; 
+import { supabase } from "../lib/supabase";
 
 export default function Vault() {
-  const [entries, setEntries] = useState<VaultEntry[]>(initialItems);
+  const [entries, setEntries] = useState<VaultEntry[]>([]);
   const [editingEntry, setEditingEntry] = useState<VaultEntry | null>(null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+
+  // Function to pull real data from your new 'vault' table
+  const fetchVaultEntries = async () => {
+    const { data, error } = await supabase
+      .from("vault")
+      .select("*")
+      .order("created_at", { ascending: false });
+    
+    if (!error && data) {
+      setEntries(data);
+    } else if (error) {
+      console.error("Error fetching vault:", error.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchVaultEntries();
+  }, []);
 
   const handleDeleted = (id: string) => {
     setEntries((prev) => prev.filter((entry) => entry.id !== id));
@@ -60,7 +46,7 @@ export default function Vault() {
               Your saved accounts and passwords.
             </p>
           </div>
-          <Button>+ Add</Button>
+          <Button onClick={() => setIsAddingNew(true)}>+ Add</Button>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -87,30 +73,35 @@ export default function Vault() {
               onEdit={(item) => setEditingEntry(item)}
             />
           ))}
+          
+          {entries.length === 0 && (
+            <div className="text-center py-20 bg-white/50 rounded-[32px] border-2 border-dashed border-gray-200">
+              <p className="text-[var(--muted)]">Your vault is empty.</p>
+              <p className="text-sm text-[var(--muted)]">Click "+ Add" to save your first password.</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {editingEntry ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl">
-            <h2 className="text-xl font-bold">Edit entry</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Task 23 will replace this with the real edit form.
-            </p>
-
-            <div className="mt-4 rounded-2xl bg-[var(--surface-2)] p-4">
-              <p className="font-semibold">{editingEntry.siteName}</p>
-              <p className="text-sm text-[var(--muted)]">{editingEntry.username}</p>
-            </div>
-
-            <div className="mt-4 flex justify-end">
-              <Button variant="secondary" onClick={() => setEditingEntry(null)}>
-                Close
-              </Button>
-            </div>
+      {/* This Modal handles both ADDING and EDITING */}
+      {(editingEntry || isAddingNew) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-[32px] bg-white p-8 shadow-2xl">
+            <VaultForm 
+              initialData={editingEntry} 
+              onSuccess={() => {
+                setEditingEntry(null);
+                setIsAddingNew(false);
+                fetchVaultEntries();
+              }}
+              onCancel={() => {
+                setEditingEntry(null);
+                setIsAddingNew(false);
+              }}
+            />
           </div>
         </div>
-      ) : null}
+      )}
     </AppLayout>
   );
 }
