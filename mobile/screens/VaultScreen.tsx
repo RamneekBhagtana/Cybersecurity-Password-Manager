@@ -1,5 +1,5 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -14,16 +14,7 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Platform,
-    Animated,
-    PanResponder,
-    LayoutAnimation,
-    UIManager,
 } from 'react-native';
-
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../lib/apiClient';
 import { useTheme } from '../lib/ThemeContext';
@@ -526,90 +517,20 @@ type ManageCatsProps = {
     onChange: (next: string[]) => void;
 };
 
-// Each row is exactly this tall (paddingVertical 12 × 2 + content 20 + marginBottom 8 = 52 → rounded to 60)
-const ITEM_H = 60;
-
 function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: ManageCatsProps) {
     const { theme } = useTheme();
     const [draft, setDraft] = useState<string[]>([]);
     const [newCat, setNewCat] = useState('');
-    // draggingIdx: which row is being held; dragTargetIdx: where it will land
-    const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
-    const [dragTargetIdx, setDragTargetIdx] = useState<number | null>(null);
-    const dragY = useRef(new Animated.Value(0)).current;
-    const draggingIdxRef = useRef<number | null>(null);
-    const draftRef = useRef<string[]>([]);
 
-    useEffect(() => {
-        if (visible) {
-            setDraft([...order]);
-            draftRef.current = [...order];
-        }
-    }, [visible, order]);
+    useEffect(() => { if (visible) setDraft([...order]); }, [visible, order]);
 
-    useEffect(() => { draftRef.current = draft; }, [draft]);
-
-    const createPanResponder = useCallback((index: number) => {
-        return PanResponder.create({
-            // Don't claim the gesture on initial touch — let taps reach buttons
-            onStartShouldSetPanResponder: () => false,
-            onStartShouldSetPanResponderCapture: () => false,
-            // Claim on clear vertical movement (> 5px) — distinguishes drag from tap
-            onMoveShouldSetPanResponder: (_evt, gs) => Math.abs(gs.dy) > 5,
-            onMoveShouldSetPanResponderCapture: (_evt, gs) => Math.abs(gs.dy) > 5,
-            onPanResponderGrant: () => {
-                draggingIdxRef.current = index;
-                setDraggingIdx(index);
-                setDragTargetIdx(index);
-                dragY.setValue(0);
-            },
-            // Animated.event hooks directly into the native event loop for smooth tracking
-            onPanResponderMove: Animated.event(
-                [null, { dy: dragY }],
-                {
-                    useNativeDriver: false,
-                    listener: (_evt: any, gs: any) => {
-                        const target = Math.max(
-                            0,
-                            Math.min(draftRef.current.length - 1, Math.round(index + gs.dy / ITEM_H)),
-                        );
-                        setDragTargetIdx(target);
-                    },
-                },
-            ),
-            onPanResponderRelease: (_evt, gs) => {
-                const from = draggingIdxRef.current!;
-                const moved = Math.round(gs.dy / ITEM_H);
-                const to = Math.max(0, Math.min(draftRef.current.length - 1, from + moved));
-
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-
-                if (from !== to) {
-                    const next = [...draftRef.current];
-                    const [item] = next.splice(from, 1);
-                    next.splice(to, 0, item);
-                    setDraft(next);
-                }
-                dragY.setValue(0);
-                setDraggingIdx(null);
-                setDragTargetIdx(null);
-                draggingIdxRef.current = null;
-            },
-            onPanResponderTerminate: () => {
-                dragY.setValue(0);
-                setDraggingIdx(null);
-                setDragTargetIdx(null);
-                draggingIdxRef.current = null;
-            },
-        });
-    }, [dragY]);
-
-    // Memoised by length — panResponder at position i always identifies as index i (correct after reorders)
-    const panResponders = useMemo(
-        () => draft.map((_, i) => createPanResponder(i)),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [draft.length, createPanResponder],
-    );
+    const move = (idx: number, dir: -1 | 1) => {
+        const next = [...draft];
+        const target = idx + dir;
+        if (target < 0 || target >= next.length) return;
+        [next[idx], next[target]] = [next[target], next[idx]];
+        setDraft(next);
+    };
 
     const remove = (idx: number) => {
         setDraft(d => d.filter((_, i) => i !== idx));
@@ -637,67 +558,26 @@ function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: Ma
                         </TouchableOpacity>
                     </View>
 
-                    {/*
-                     * Draggable list is NOT inside a ScrollView.
-                     * Nesting PanResponder inside ScrollView causes gesture conflicts —
-                     * moving it to a plain View gives PanResponder uncontested control.
-                     */}
-                    <View style={catStyles.listSection}>
-                        <Text style={[catStyles.hint, { color: theme.placeholder }]}>
-                            Hold ≡ and drag to reorder
-                        </Text>
-
-                        {draft.map((cat, idx) => {
-                            const isDragging = draggingIdx === idx;
-                            const isDropTarget =
-                                dragTargetIdx === idx &&
-                                draggingIdx !== null &&
-                                draggingIdx !== idx;
-
-                            return (
-                                <Animated.View
-                                    key={cat}
-                                    // panHandlers on the entire row so any vertical swipe starts drag;
-                                    // taps still reach the ✕ button because we use onMoveShouldSetPanResponder
-                                    {...panResponders[idx]?.panHandlers}
-                                    style={[
-                                        catStyles.row,
-                                        {
-                                            backgroundColor: theme.card,
-                                            borderWidth: 1.5,
-                                            borderColor: isDropTarget ? purple : 'transparent',
-                                            opacity: isDragging ? 0.72 : 1,
-                                        },
-                                        isDragging && {
-                                            transform: [{ translateY: dragY }],
-                                            zIndex: 999,
-                                            elevation: 10,
-                                            shadowColor: '#000',
-                                            shadowOffset: { width: 0, height: 6 },
-                                            shadowOpacity: 0.18,
-                                            shadowRadius: 8,
-                                        },
-                                    ]}
-                                >
-                                    {/* ≡ is a visual hint — dragging works anywhere on the row */}
-                                    <Text style={[catStyles.dragIcon, { color: theme.placeholder, marginRight: 12 }]}>≡</Text>
-
-                                    <Text style={[catStyles.catName, { color: theme.text }]}>
-                                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                                    </Text>
-
-                                    <TouchableOpacity
-                                        onPress={() => remove(idx)}
-                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                    >
-                                        <Text style={{ fontSize: 16, color: '#EF4444', fontWeight: '700' }}>✕</Text>
+                    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+                        {draft.map((cat, idx) => (
+                            <View key={cat} style={[catStyles.row, { backgroundColor: theme.card }]}>
+                                <Text style={[catStyles.catName, { color: theme.text }]}>
+                                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                </Text>
+                                <View style={catStyles.rowActions}>
+                                    <TouchableOpacity onPress={() => move(idx, -1)} style={catStyles.arrowBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                                        <Text style={[catStyles.arrowText, { color: theme.subtext }]}>↑</Text>
                                     </TouchableOpacity>
-                                </Animated.View>
-                            );
-                        })}
-                    </View>
+                                    <TouchableOpacity onPress={() => move(idx, 1)} style={catStyles.arrowBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                                        <Text style={[catStyles.arrowText, { color: theme.subtext }]}>↓</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => remove(idx)} style={catStyles.arrowBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                                        <Text style={[catStyles.arrowText, { color: '#EF4444' }]}>✕</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ))}
 
-                    {/* Add + Save — separate from the draggable region */}
                     <View style={catStyles.addSection}>
                         <Text style={[catStyles.addLabel, { color: theme.subtext }]}>ADD CATEGORY</Text>
                         <View style={catStyles.addRow}>
@@ -728,6 +608,7 @@ function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: Ma
                             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Save</Text>
                         </TouchableOpacity>
                     </View>
+                    </ScrollView>
                 </KeyboardAvoidingView>
             </SafeAreaView>
         </Modal>
@@ -737,15 +618,14 @@ function ManageCategoriesModal({ visible, order, purple, onClose, onChange }: Ma
 const catStyles = StyleSheet.create({
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingBottom: 12 },
     title: { fontSize: 20, fontWeight: '800' },
-    hint: { fontSize: 12, marginBottom: 10 },
-    // Plain View — no ScrollView — so PanResponder has no gesture competition
-    listSection: { paddingHorizontal: 20, paddingBottom: 4 },
-    row: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 8 },
+    row: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
     catName: { flex: 1, fontSize: 14, fontWeight: '600' },
-    dragIcon: { fontSize: 22 },
-    addSection: { paddingHorizontal: 20, paddingTop: 8 },
-    addLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
-    addRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+    rowActions: { flexDirection: 'row', gap: 2 },
+    arrowBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+    arrowText: { fontSize: 16, fontWeight: '700' },
+    addSection: { marginTop: 20 },
+    addLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8, color: '#888' },
+    addRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
     addInput: { flex: 1, borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14 },
     addBtn: { width: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
     saveBtn: { borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
