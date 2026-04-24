@@ -138,7 +138,7 @@ function EntryFormModal({ visible, editing, purple, onClose, onSaved }: EntryFor
     const inputBase = [
         formStyles.input,
         { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border },
-    ] as const;
+    ];
 
     return (
         <Modal

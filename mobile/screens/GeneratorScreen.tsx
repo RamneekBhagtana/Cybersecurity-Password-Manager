@@ -78,7 +78,6 @@ export default function GeneratorScreen() {
         [upper, lower, numbers, special].filter(Boolean).length;
 
     const tryToggle = (
-        current: boolean,
         setter: (v: boolean) => void,
         newVal: boolean
     ) => {
@@ -272,7 +271,7 @@ export default function GeneratorScreen() {
                                         </Text>
                                         <Switch
                                             value={value}
-                                            onValueChange={v => tryToggle(value, setter, v)}
+                                            onValueChange={v => tryToggle(setter, v)}
                                             trackColor={{ false: theme.border, true: PURPLE }}
                                             thumbColor="#fff"
                                         />
