@@ -92,14 +92,11 @@ function EntryFormModal({ visible, editing, purple, categories, onClose, onSaved
     const [password, setPassword] = useState('');
     const [masterPassword, setMasterPassword] = useState('');
     const [notes, setNotes] = useState('');
-    const [selectedCat, setSelectedCat] = useState('');
-    const [customCat, setCustomCat] = useState('');
+    const [selectedCats, setSelectedCats] = useState<string[]>([]);
+    const [customCatInput, setCustomCatInput] = useState('');
     const [saving, setSaving] = useState(false);
     const [showPwd, setShowPwd] = useState(false);
     const [showMaster, setShowMaster] = useState(false);
-
-    // Derived: actual tag value to submit
-    const effectiveCategory = customCat.trim() || selectedCat;
 
     // Populate fields when modal opens
     useEffect(() => {
@@ -109,18 +106,12 @@ function EntryFormModal({ visible, editing, purple, categories, onClose, onSaved
             setPassword('');
             setMasterPassword('');
             setNotes('');
-            const existingTag = editing?.tags[0] ?? '';
-            if (categories.includes(existingTag)) {
-                setSelectedCat(existingTag);
-                setCustomCat('');
-            } else {
-                setSelectedCat('');
-                setCustomCat(existingTag);
-            }
+            setSelectedCats(editing?.tags ?? []);
+            setCustomCatInput('');
             setShowPwd(false);
             setShowMaster(false);
         }
-    }, [visible, editing, categories]);
+    }, [visible, editing]);
 
     // Master password is only needed when creating (always) or editing with a new password.
     const needsMasterPwd = !editing || !!password.trim();
@@ -143,7 +134,7 @@ function EntryFormModal({ visible, editing, purple, categories, onClose, onSaved
         try {
             const payload: Record<string, any> = {
                 title: title.trim(),
-                tags: effectiveCategory ? [effectiveCategory.toLowerCase()] : [],
+                tags: selectedCats.map(t => t.toLowerCase()),
             };
             if (needsMasterPwd) payload.master_password = masterPassword.trim();
             if (username.trim()) payload.username = username.trim();
@@ -297,69 +288,105 @@ function EntryFormModal({ visible, editing, purple, categories, onClose, onSaved
                             </TouchableOpacity>
                         </View>
 
-                        {/* Category chips — shows all user-defined categories */}
-                        {categories.length > 0 && (
-                            <>
-                                <Text style={[formStyles.label, { color: theme.subtext, marginTop: 14 }]}>
-                                    CATEGORY
-                                </Text>
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={{ gap: 8, marginBottom: 8 }}
-                                >
-                                    {categories.map(cat => {
-                                        const active = selectedCat === cat && !customCat.trim();
-                                        return (
-                                            <TouchableOpacity
-                                                key={cat}
-                                                style={[
-                                                    formStyles.categoryBtn,
-                                                    {
-                                                        backgroundColor: active ? purple : theme.inputBg,
-                                                        borderColor: active ? purple : theme.border,
-                                                    },
-                                                ]}
-                                                onPress={() => {
-                                                    setSelectedCat(active ? '' : cat);
-                                                    setCustomCat('');
-                                                }}
-                                                activeOpacity={0.8}
-                                            >
-                                                <Text style={{ fontSize: 13, fontWeight: '600', color: active ? '#fff' : theme.subtext }}>
-                                                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </ScrollView>
+                        {/* Category chips — multi-select */}
+                        <Text style={[formStyles.label, { color: theme.subtext, marginTop: 14 }]}>
+                            CATEGORIES
+                        </Text>
 
-                                {/* Custom category input */}
-                                <View style={[formStyles.customCatRow, { borderColor: theme.border }]}>
-                                    <Text style={[formStyles.customCatLabel, { color: theme.placeholder }]}>
-                                        or custom:
-                                    </Text>
-                                    <TextInput
-                                        style={[
-                                            formStyles.customCatInput,
-                                            {
-                                                color: theme.text,
-                                                borderColor: customCat.trim() ? purple : 'transparent',
-                                                backgroundColor: theme.inputBg,
-                                            },
-                                        ]}
-                                        value={customCat}
-                                        onChangeText={v => {
-                                            setCustomCat(v);
-                                            if (v.trim()) setSelectedCat('');
-                                        }}
-                                        placeholder="e.g. finance, travel…"
-                                        placeholderTextColor={theme.placeholder}
-                                        autoCapitalize="none"
-                                    />
-                                </View>
-                            </>
+                        {/* Preset categories — toggleable */}
+                        {categories.length > 0 && (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ gap: 8, marginBottom: 8 }}
+                            >
+                                {categories.map(cat => {
+                                    const active = selectedCats.includes(cat);
+                                    return (
+                                        <TouchableOpacity
+                                            key={cat}
+                                            style={[
+                                                formStyles.categoryBtn,
+                                                {
+                                                    backgroundColor: active ? purple : theme.inputBg,
+                                                    borderColor: active ? purple : theme.border,
+                                                },
+                                            ]}
+                                            onPress={() =>
+                                                setSelectedCats(prev =>
+                                                    active ? prev.filter(c => c !== cat) : [...prev, cat]
+                                                )
+                                            }
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={{ fontSize: 13, fontWeight: '600', color: active ? '#fff' : theme.subtext }}>
+                                                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
                         )}
+
+                        {/* Custom tags that were added (not in categories list) */}
+                        {selectedCats.filter(c => !categories.includes(c)).length > 0 && (
+                            <View style={formStyles.customTagsRow}>
+                                {selectedCats.filter(c => !categories.includes(c)).map(cat => (
+                                    <View key={cat} style={[formStyles.customTagChip, { backgroundColor: purple }]}>
+                                        <Text style={formStyles.customTagText}>
+                                            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                        </Text>
+                                        <TouchableOpacity
+                                            onPress={() => setSelectedCats(prev => prev.filter(c => c !== cat))}
+                                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                        >
+                                            <Text style={formStyles.customTagRemove}>✕</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Add a custom category */}
+                        <View style={formStyles.customCatRow}>
+                            <TextInput
+                                style={[
+                                    formStyles.customCatInput,
+                                    {
+                                        color: theme.text,
+                                        borderColor: customCatInput.trim() ? purple : theme.border,
+                                        backgroundColor: theme.inputBg,
+                                        flex: 1,
+                                    },
+                                ]}
+                                value={customCatInput}
+                                onChangeText={setCustomCatInput}
+                                placeholder="Add custom category…"
+                                placeholderTextColor={theme.placeholder}
+                                autoCapitalize="none"
+                                returnKeyType="done"
+                                onSubmitEditing={() => {
+                                    const val = customCatInput.trim().toLowerCase();
+                                    if (val && !selectedCats.includes(val)) {
+                                        setSelectedCats(prev => [...prev, val]);
+                                    }
+                                    setCustomCatInput('');
+                                }}
+                            />
+                            <TouchableOpacity
+                                style={[formStyles.customCatAddBtn, { backgroundColor: customCatInput.trim() ? purple : theme.inputBg, borderColor: customCatInput.trim() ? purple : theme.border }]}
+                                onPress={() => {
+                                    const val = customCatInput.trim().toLowerCase();
+                                    if (val && !selectedCats.includes(val)) {
+                                        setSelectedCats(prev => [...prev, val]);
+                                    }
+                                    setCustomCatInput('');
+                                }}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={{ fontSize: 15, fontWeight: '700', color: customCatInput.trim() ? '#fff' : theme.placeholder }}>+</Text>
+                            </TouchableOpacity>
+                        </View>
 
                         {/* Notes */}
                         <Text style={[formStyles.label, { color: theme.subtext, marginTop: 14 }]}>NOTES</Text>
@@ -469,24 +496,50 @@ const formStyles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1.5,
     },
+    customTagsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 8,
+    },
+    customTagChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    customTagText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    customTagRemove: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.8)',
+        fontWeight: '700',
+    },
     customCatRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        borderTopWidth: 0,
-    },
-    customCatLabel: {
-        fontSize: 12,
-        fontWeight: '500',
-        flexShrink: 0,
+        marginTop: 4,
     },
     customCatInput: {
-        flex: 1,
         borderRadius: 8,
         borderWidth: 1.5,
         paddingHorizontal: 10,
         paddingVertical: 7,
         fontSize: 13,
+    },
+    customCatAddBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 8,
+        borderWidth: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     masterBox: {
         borderRadius: 10,
