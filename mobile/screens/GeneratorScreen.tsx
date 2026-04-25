@@ -79,6 +79,8 @@ export default function GeneratorScreen() {
     const [separator, setSeparator] = useState('-');
     const [customSep, setCustomSep] = useState('');
     const [wordCount, setWordCount] = useState(4);
+    const [capitalize, setCapitalize] = useState(false);
+    const [includeNumber, setIncludeNumber] = useState(false);
     const [password, setPassword] = useState('');
     const [generating, setGenerating] = useState(false);
 
@@ -118,7 +120,8 @@ export default function GeneratorScreen() {
                 const res = await apiClient.post('/generator/passphrase', {
                     words: wordCount,
                     separator: sep,
-                    capitalize: false,
+                    capitalize,
+                    include_number: includeNumber,
                 });
                 setPassword(res.data.passphrase);
             }
@@ -130,7 +133,7 @@ export default function GeneratorScreen() {
         } finally {
             setGenerating(false);
         }
-    }, [length, upper, lower, numbers, special, mode, separator, customSep, wordCount]);
+    }, [length, upper, lower, numbers, special, mode, separator, customSep, wordCount, capitalize, includeNumber]);
 
     // Generate on mount and when mode changes
     useEffect(() => {
@@ -408,6 +411,31 @@ export default function GeneratorScreen() {
                                     <View style={{ width: 20 }} />
                                 )}
                             </View>
+                        </View>
+
+                        {/* Capitalize + Include Number toggles */}
+                        <View style={[styles.settingCard, { backgroundColor: theme.card }]}>
+                            {[
+                                { label: 'Capitalize Words', value: capitalize, setter: setCapitalize },
+                                { label: 'Include Number', value: includeNumber, setter: setIncludeNumber },
+                            ].map(({ label, value, setter }, idx, arr) => (
+                                <View key={label}>
+                                    <View style={styles.switchRow}>
+                                        <Text style={[styles.settingLabel, { color: theme.text }]}>
+                                            {label}
+                                        </Text>
+                                        <Switch
+                                            value={value}
+                                            onValueChange={setter}
+                                            trackColor={{ false: theme.border, true: PURPLE }}
+                                            thumbColor="#fff"
+                                        />
+                                    </View>
+                                    {idx < arr.length - 1 && (
+                                        <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+                                    )}
+                                </View>
+                            ))}
                         </View>
 
                         {/* Info card */}

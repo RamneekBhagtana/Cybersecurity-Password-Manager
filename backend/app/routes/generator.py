@@ -63,9 +63,13 @@ def generate_passphrase():
     count = max(2, min(5, count))
     separator = data.get("separator", "-")
     capitalize = bool(data.get("capitalize", False))
+    include_number = bool(data.get("include_number", False))
 
     chosen = [secrets.choice(_WORDS) for _ in range(count)]
     if capitalize:
         chosen = [w.capitalize() for w in chosen]
+    if include_number:
+        digit = str(secrets.randbelow(10))
+        chosen[-1] = chosen[-1] + digit
 
     return jsonify({"passphrase": separator.join(chosen)})
