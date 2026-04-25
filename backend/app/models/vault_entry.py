@@ -26,12 +26,14 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Integer,
     LargeBinary,
     String,
     Text,
     event,
 )
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import deferred
 
 from app.extensions import db
 
@@ -102,6 +104,28 @@ class VaultEntry(db.Model):
         nullable=True,
         comment="Optional freeform notes (stored plaintext)",
     )
+
+    # ------------------------------------------------------------------ #
+    #  Password strength score (1=Weak, 2=Fair, 3=Good, 4=Strong)         #
+    #  Computed from the plaintext password at create/update time.         #
+    # ------------------------------------------------------------------ #
+    password_strength = Column(
+        Integer,
+        nullable=True,
+        comment="1=Weak 2=Fair 3=Good 4=Strong — computed at save time from plaintext",
+    )
+
+    # ------------------------------------------------------------------ #
+    #  Password hash (SHA-256 of the plaintext password)                   #
+    #  Used solely for reuse detection — never exposes the plaintext.      #
+    #  Marked deferred so it is NOT included in the main SELECT —          #
+    #  this keeps GET /vault working even before the migration has run.    #
+    # ------------------------------------------------------------------ #
+    password_hash = deferred(Column(
+        String(64),
+        nullable=True,
+        comment="SHA-256 hex digest of plaintext password — for reuse detection only",
+    ))
 
     # ------------------------------------------------------------------ #
     #  Encrypted credential — three columns, always used together          #
@@ -178,6 +202,7 @@ class VaultEntry(db.Model):
             "username": self.username,
             "url": self.url,
             "notes": self.notes,
+            "password_strength": self.password_strength,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "tags": [t.tag_name for t in self.tags] if self.tags else [],

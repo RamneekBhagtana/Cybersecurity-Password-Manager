@@ -1,25 +1,42 @@
-import { useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState, useCallback } from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     ScrollView,
     Switch,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../hooks/useSession';
+import apiClient from '../lib/apiClient';
+import { useTheme } from '../lib/ThemeContext';
+import type { RootStackParamList } from '../App';
 
+// ── Types ─────────────────────────────────────────────────────────
+type VaultStats = {
+    total: number;
+    weak: number;
+    reused: number;
+};
+
+// ─────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
     const { session } = useSession();
-    const [darkMode, setDarkMode] = useState(false);
+    const { theme, darkMode, setDarkMode } = useTheme();
+    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+    const [stats, setStats] = useState<VaultStats>({ total: 0, weak: 0, reused: 0 });
+    const [statsLoading, setStatsLoading] = useState(true);
 
     const email = session?.user?.email ?? 'user@email.com';
     const initial = email.charAt(0).toUpperCase();
 
-    // Format join date from session metadata or fallback
     const createdAt = session?.user?.created_at
         ? new Date(session.user.created_at).toLocaleDateString('en-US', {
               month: 'short',
@@ -27,109 +44,166 @@ export default function ProfileScreen() {
           })
         : 'Mar 2026';
 
-    const handleSignOut = async () => {
+    // ── Fetch vault stats — re-runs every time this tab gains focus ───
+    useFocusEffect(
+        useCallback(() => {
+            let cancelled = false;
+            setStatsLoading(true);
+            const fetchStats = async () => {
+                try {
+                    const res = await apiClient.get('/vault');
+                    if (cancelled) return;
+                    const entries: any[] = res.data.entries ?? [];
+                    const weakCount = entries.filter(
+                        (e: any) => e.password_strength === 1
+                    ).length;
+                    setStats({
+                        total: entries.length,
+                        weak: weakCount,
+                        reused: res.data.reused_count ?? 0,
+                    });
+                } catch {
+                    // Non-critical — silently ignore
+                } finally {
+                    if (!cancelled) setStatsLoading(false);
+                }
+            };
+            fetchStats();
+            return () => { cancelled = true; };
+        }, [])
+    );
+
+    // ── Sign out ──────────────────────────────────────────────
+    const handleSignOut = () => {
         Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Sign Out',
                 style: 'destructive',
-                onPress: async () => {
-                    await supabase.auth.signOut();
-                },
+                onPress: () => supabase.auth.signOut(),
             },
         ]);
     };
 
+    // ── Menu items ────────────────────────────────────────────
     const menuItems = [
         {
+            icon: '🔑',
             title: 'Change Password',
-            subtitle: 'Update your master password',
-            onPress: () => Alert.alert('Coming Soon', 'This feature will be available soon.'),
+            subtitle: 'Update your account password',
+            onPress: () => navigation.navigate('ChangePassword'),
         },
         {
+            icon: '📊',
             title: 'Security Reports',
-            subtitle: 'View weak & reused passwords',
-            onPress: () => Alert.alert('Coming Soon', 'This feature will be available soon.'),
+            subtitle: 'Recent data breaches & vault health',
+            onPress: () => navigation.navigate('SecurityReports'),
         },
         {
+            icon: 'ℹ️',
             title: 'About',
             subtitle: 'SecureVault v1.0',
-            onPress: () => {},
+            onPress: () =>
+                Alert.alert(
+                    'SecureVault v1.0',
+                    'A secure password manager built with Flask, PostgreSQL, Supabase, and React Native.'
+                ),
         },
     ];
 
+    // ── Render ────────────────────────────────────────────────
     return (
-        <SafeAreaView style={styles.safe}>
-            <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
+            <ScrollView
+                contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Header */}
-                <Text style={styles.headerTitle}>Profile</Text>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>Profile</Text>
 
-                {/* User Card */}
-                <View style={styles.userCard}>
-                    <View style={styles.avatar}>
+                {/* User card */}
+                <View style={[styles.userCard, { backgroundColor: theme.card }]}>
+                    <View style={[styles.avatar, { backgroundColor: theme.purple, shadowColor: theme.purple }]}>
                         <Text style={styles.avatarText}>{initial}</Text>
                     </View>
-                    <Text style={styles.userEmail}>{email}</Text>
-                    <Text style={styles.memberSince}>Member since {createdAt}</Text>
+                    <Text style={[styles.userEmail, { color: theme.text }]} numberOfLines={1}>
+                        {email}
+                    </Text>
+                    <Text style={[styles.memberSince, { color: theme.placeholder }]}>
+                        Member since {createdAt}
+                    </Text>
                 </View>
 
-                {/* Stats Row */}
+                {/* Stats row */}
                 <View style={styles.statsRow}>
-                    <View style={styles.statCard}>
-                        <Text style={styles.statNumber}>6</Text>
-                        <Text style={styles.statLabel}>Total</Text>
-                    </View>
-                    <View style={styles.statCard}>
-                        <Text style={[styles.statNumber, { color: '#EF4444' }]}>1</Text>
-                        <Text style={styles.statLabel}>Weak</Text>
-                    </View>
-                    <View style={styles.statCard}>
-                        <Text style={[styles.statNumber, { color: '#22C55E' }]}>0</Text>
-                        <Text style={styles.statLabel}>Reused</Text>
-                    </View>
+                    {[
+                        { label: 'Total', value: stats.total, color: theme.text },
+                        { label: 'Weak', value: stats.weak, color: '#EF4444' },
+                        { label: 'Reused', value: stats.reused, color: stats.reused > 0 ? '#F59E0B' : '#22C55E' },
+                    ].map(({ label, value, color }) => (
+                        <View key={label} style={[styles.statCard, { backgroundColor: theme.card }]}>
+                            {statsLoading ? (
+                                <ActivityIndicator color={color} size="small" />
+                            ) : (
+                                <Text style={[styles.statNumber, { color }]}>{value}</Text>
+                            )}
+                            <Text style={[styles.statLabel, { color: theme.placeholder }]}>{label}</Text>
+                        </View>
+                    ))}
                 </View>
 
-                {/* Dark Mode Toggle */}
-                <View style={styles.toggleCard}>
+                {/* Dark mode toggle — wired to ThemeContext */}
+                <View style={[styles.toggleCard, { backgroundColor: theme.card }]}>
                     <View style={styles.toggleLeft}>
-                        <Text style={styles.toggleIcon}>☀️</Text>
+                        <Text style={styles.toggleIcon}>{darkMode ? '🌙' : '☀️'}</Text>
                         <View>
-                            <Text style={styles.toggleTitle}>Light Mode</Text>
-                            <Text style={styles.toggleSubtitle}>
-                                {darkMode ? 'Tap to switch to light' : 'Tap to switch to dark'}
+                            <Text style={[styles.toggleTitle, { color: theme.text }]}>
+                                {darkMode ? 'Dark Mode' : 'Light Mode'}
+                            </Text>
+                            <Text style={[styles.toggleSubtitle, { color: theme.placeholder }]}>
+                                {darkMode ? 'Easier on the eyes' : 'Bright and clean'}
                             </Text>
                         </View>
                     </View>
                     <Switch
                         value={darkMode}
                         onValueChange={setDarkMode}
-                        trackColor={{ false: '#E5E7EB', true: '#6C63FF' }}
+                        trackColor={{ false: theme.border, true: theme.purple }}
                         thumbColor="#fff"
                     />
                 </View>
 
-                {/* Menu Items */}
-                <View style={styles.menuCard}>
-                    {menuItems.map((item, index) => (
-                        <TouchableOpacity
-                            key={item.title}
-                            style={[
-                                styles.menuItem,
-                                index < menuItems.length - 1 && styles.menuItemBorder,
-                            ]}
-                            onPress={item.onPress}
-                        >
-                            <View style={styles.menuItemText}>
-                                <Text style={styles.menuTitle}>{item.title}</Text>
-                                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-                            </View>
-                            <Text style={styles.menuChevron}>›</Text>
-                        </TouchableOpacity>
+                {/* Menu items */}
+                <View style={[styles.menuCard, { backgroundColor: theme.card }]}>
+                    {menuItems.map((item, idx) => (
+                        <View key={item.title}>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={item.onPress}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.menuIcon}>{item.icon}</Text>
+                                <View style={styles.menuTextContainer}>
+                                    <Text style={[styles.menuTitle, { color: theme.text }]}>{item.title}</Text>
+                                    <Text style={[styles.menuSubtitle, { color: theme.placeholder }]}>
+                                        {item.subtitle}
+                                    </Text>
+                                </View>
+                                <Text style={[styles.menuChevron, { color: theme.border }]}>›</Text>
+                            </TouchableOpacity>
+                            {idx < menuItems.length - 1 && (
+                                <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+                            )}
+                        </View>
                     ))}
                 </View>
 
-                {/* Sign Out */}
-                <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
+                {/* Sign out */}
+                <TouchableOpacity
+                    style={[styles.signOutBtn, { backgroundColor: theme.card }]}
+                    onPress={handleSignOut}
+                    activeOpacity={0.85}
+                >
                     <Text style={styles.signOutText}>Sign Out</Text>
                 </TouchableOpacity>
             </ScrollView>
@@ -137,148 +211,129 @@ export default function ProfileScreen() {
     );
 }
 
-const BG = '#F0F2F8';
-const PURPLE = '#6C63FF';
-
+// ── Styles ────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-    safe: {
-        flex: 1,
-        backgroundColor: BG,
-    },
     container: {
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 100,
+        padding: 20,
     },
     headerTitle: {
         fontSize: 26,
         fontWeight: '800',
-        color: '#1a1a2e',
-        marginBottom: 16,
-    },
-    userCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 20,
-        alignItems: 'center',
         marginBottom: 12,
     },
+    userCard: {
+        borderRadius: 16,
+        padding: 24,
+        alignItems: 'center',
+        marginBottom: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+    },
     avatar: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: PURPLE,
+        width: 72,
+        height: 72,
+        borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 10,
+        marginBottom: 12,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 6,
     },
     avatarText: {
         color: '#fff',
-        fontSize: 26,
+        fontSize: 32,
         fontWeight: '800',
     },
     userEmail: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#1a1a2e',
         marginBottom: 4,
     },
     memberSince: {
         fontSize: 13,
-        color: '#888',
     },
     statsRow: {
         flexDirection: 'row',
         gap: 10,
-        marginBottom: 12,
+        marginBottom: 14,
     },
     statCard: {
         flex: 1,
-        backgroundColor: '#fff',
         borderRadius: 12,
-        paddingVertical: 14,
+        paddingVertical: 18,
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 4,
+        elevation: 1,
     },
     statNumber: {
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: '800',
-        color: '#1a1a2e',
+        marginBottom: 2,
     },
     statLabel: {
         fontSize: 12,
-        color: '#888',
-        marginTop: 2,
+        fontWeight: '600',
     },
     toggleCard: {
-        backgroundColor: '#fff',
         borderRadius: 12,
         padding: 16,
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 12,
+        alignItems: 'center',
+        marginBottom: 14,
     },
     toggleLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
     },
-    toggleIcon: {
-        fontSize: 22,
-    },
+    toggleIcon: { fontSize: 22 },
     toggleTitle: {
         fontSize: 15,
-        fontWeight: '600',
-        color: '#1a1a2e',
+        fontWeight: '700',
     },
     toggleSubtitle: {
         fontSize: 12,
-        color: '#888',
         marginTop: 2,
     },
     menuCard: {
-        backgroundColor: '#fff',
         borderRadius: 12,
-        marginBottom: 16,
+        marginBottom: 14,
         overflow: 'hidden',
     },
     menuItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 16,
+        paddingVertical: 14,
         paddingHorizontal: 16,
     },
-    menuItemBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
-    },
-    menuItemText: {
-        flex: 1,
-    },
-    menuTitle: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#1a1a2e',
-    },
-    menuSubtitle: {
-        fontSize: 12,
-        color: '#888',
-        marginTop: 2,
-    },
-    menuChevron: {
-        fontSize: 20,
-        color: '#ccc',
+    menuIcon: { fontSize: 22, marginRight: 14 },
+    menuTextContainer: { flex: 1 },
+    menuTitle: { fontSize: 15, fontWeight: '700' },
+    menuSubtitle: { fontSize: 12, marginTop: 2 },
+    menuChevron: { fontSize: 22, fontWeight: '300' },
+    divider: {
+        height: 1,
+        marginLeft: 52,
     },
     signOutBtn: {
-        backgroundColor: '#FEE2E2',
         borderRadius: 12,
-        paddingVertical: 16,
+        paddingVertical: 15,
         alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#EF4444',
     },
     signOutText: {
         color: '#EF4444',
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '700',
     },
 });
