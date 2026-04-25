@@ -116,8 +116,9 @@ function PasswordActionsSheet({ visible, entry, purple, onClose }: PasswordActio
         if (!masterPassword.trim() || !entry) return;
         setLoading(true);
         try {
-            const res = await apiClient.get(`/vault/${entry.entry_id}`, {
-                data: { master_password: masterPassword.trim() },
+            // POST /vault/:id/decrypt — avoids non-standard GET-with-body
+            const res = await apiClient.post(`/vault/${entry.entry_id}/decrypt`, {
+                master_password: masterPassword.trim(),
             });
             const pwd: string = res.data.password ?? '';
 
@@ -130,16 +131,23 @@ function PasswordActionsSheet({ visible, entry, purple, onClose }: PasswordActio
                 setMode('view');
             }
         } catch (err: any) {
-            let msg: string =
+            const msg: string =
                 err.response?.data?.error?.message ??
                 err.message ??
-                'Failed to decrypt entry.';
-            if (err.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout')) {
-                msg = 'Request timed out. Check your connection and try again.';
-            } else if (msg.toLowerCase().includes('decryption failed')) {
-                msg = 'Incorrect master password — please try again.';
+                '';
+            const isWrongPassword =
+                msg.toLowerCase().includes('decryption failed') ||
+                msg.toLowerCase().includes('check your master password');
+            const isTimeout =
+                err.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout');
+
+            if (isWrongPassword) {
+                Alert.alert('Incorrect', 'Wrong master password — please try again.');
+            } else if (isTimeout) {
+                Alert.alert('Timed Out', 'Request timed out. Check your connection and try again.');
+            } else {
+                Alert.alert('Error', msg || 'Failed to decrypt entry.');
             }
-            Alert.alert('Error', msg);
         } finally {
             setLoading(false);
         }
