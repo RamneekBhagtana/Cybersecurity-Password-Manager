@@ -1197,8 +1197,6 @@ export default function VaultScreen() {
         }
     }, [fetchVault]);
 
-    const onRefresh = () => { setRefreshing(true); fetchVault(); };
-
     // ── Filter entries by active tag ──────────────────────────
     const filtered =
         activeTag === 'all'
