@@ -1,5 +1,6 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
     View,
     Text,
@@ -1309,7 +1310,7 @@ export default function VaultScreen() {
                             onPress={() => setRateAllVisible(true)}
                             activeOpacity={0.85}
                         >
-                            <Text style={{ fontSize: 16, marginRight: 10 }}>⚠️</Text>
+                            <Ionicons name="warning" size={18} color={theme.isDark ? '#F59E0B' : '#92400E'} style={{ marginRight: 10 }} />
                             <View style={{ flex: 1 }}>
                                 <Text style={{ color: theme.isDark ? '#F59E0B' : '#92400E', fontWeight: '700', fontSize: 13 }}>
                                     Some passwords haven't been rated
@@ -1318,7 +1319,7 @@ export default function VaultScreen() {
                                     Tap to analyze all password strengths
                                 </Text>
                             </View>
-                            <Text style={{ color: theme.isDark ? '#F59E0B' : '#92400E', fontSize: 20 }}>›</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.isDark ? '#F59E0B' : '#92400E'} />
                         </TouchableOpacity>
                     ) : null
                 }
@@ -1391,7 +1392,7 @@ export default function VaultScreen() {
                                 }}
                                 activeOpacity={0.6}
                             >
-                                <Text style={[styles.dotsText, { color: theme.subtext }]}>⋯</Text>
+                                <Ionicons name="ellipsis-horizontal" size={18} color={theme.subtext} />
                             </TouchableOpacity>
                         </TouchableOpacity>
                     );

@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSession } from './hooks/useSession';
 import { View, Text } from 'react-native';
 import { ThemeProvider, useTheme } from './lib/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
 
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
@@ -41,7 +42,7 @@ function MainNavigator() {
     const { theme } = useTheme();
     return (
         <MainTab.Navigator
-            screenOptions={{
+            screenOptions={({ route }) => ({
                 headerShown: false,
                 tabBarStyle: {
                     backgroundColor: theme.tabBar,
@@ -49,7 +50,16 @@ function MainNavigator() {
                 },
                 tabBarActiveTintColor: theme.purple,
                 tabBarInactiveTintColor: theme.placeholder,
-            }}
+                tabBarIcon: ({ focused, color, size }) => {
+                    const icons: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
+                        Vault:     { active: 'lock-closed',  inactive: 'lock-closed-outline' },
+                        Generator: { active: 'key',          inactive: 'key-outline' },
+                        Profile:   { active: 'person',       inactive: 'person-outline' },
+                    };
+                    const { active, inactive } = icons[route.name] ?? { active: 'ellipse', inactive: 'ellipse-outline' };
+                    return <Ionicons name={focused ? active : inactive} size={size} color={color} />;
+                },
+            })}
         >
             <MainTab.Screen name="Vault" component={VaultScreen} />
             <MainTab.Screen name="Generator" component={GeneratorScreen} />
