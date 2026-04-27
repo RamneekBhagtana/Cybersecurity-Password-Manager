@@ -120,7 +120,10 @@ export default function Vault() {
 
       {(editingEntry || isAddingNew) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-[32px] bg-white p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div
+            className="w-full max-w-md rounded-[32px] p-8 shadow-2xl max-h-[90vh] overflow-y-auto"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+          >
             <VaultForm
               initialData={editingEntry}
               onSuccess={() => {

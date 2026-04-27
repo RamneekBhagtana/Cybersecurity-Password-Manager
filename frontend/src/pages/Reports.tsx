@@ -10,7 +10,7 @@ const BREACHES = [
     records: "2.9 billion records",
     severity: "CRITICAL",
     description: "Social Security numbers, names, addresses, and phone numbers leaked from a background-check data broker.",
-    learnMoreUrl: "https://www.google.com/search?q=National+Public+Data+breach+2024",
+    learnMoreUrl: "https://www.bleepingcomputer.com/news/security/national-public-data-confirms-breach-exposing-social-security-numbers/",
   },
   {
     name: "Ticketmaster / Live Nation",
@@ -18,7 +18,7 @@ const BREACHES = [
     records: "560 million records",
     severity: "HIGH",
     description: "Customer names, addresses, phone numbers, and partial payment card data exposed by the ShinyHunters group.",
-    learnMoreUrl: "https://www.google.com/search?q=Ticketmaster+Live+Nation+breach+2024",
+    learnMoreUrl: "https://www.bleepingcomputer.com/news/security/ticketmaster-confirms-massive-breach-after-stolen-data-for-sale-online/",
   },
   {
     name: "AT&T",
@@ -26,7 +26,7 @@ const BREACHES = [
     records: "110 million records",
     severity: "HIGH",
     description: "Call and text metadata for nearly all AT&T wireless customers exposed from a third-party cloud platform.",
-    learnMoreUrl: "https://www.google.com/search?q=ATT+data+breach+2024",
+    learnMoreUrl: "https://www.bleepingcomputer.com/news/security/massive-atandt-data-breach-exposes-call-logs-of-109-million-customers/",
   },
   {
     name: "Dell",
@@ -34,7 +34,7 @@ const BREACHES = [
     records: "49 million records",
     severity: "MEDIUM",
     description: "Customer order data including names, physical addresses, and Dell hardware details posted to a hacking forum.",
-    learnMoreUrl: "https://www.google.com/search?q=Dell+data+breach+2024",
+    learnMoreUrl: "https://www.bleepingcomputer.com/news/security/dell-api-abused-to-steal-49-million-customer-records-in-data-breach/",
   },
   {
     name: "Change Healthcare",
@@ -42,7 +42,7 @@ const BREACHES = [
     records: "100 million+ records",
     severity: "CRITICAL",
     description: "Largest healthcare data breach in US history. Patient records, insurance details, and medical histories exposed.",
-    learnMoreUrl: "https://www.google.com/search?q=Change+Healthcare+UnitedHealth+breach+2024",
+    learnMoreUrl: "https://www.bleepingcomputer.com/news/security/unitedhealth-says-data-of-100-million-stolen-in-change-healthcare-breach/",
   },
   {
     name: "Trello",
@@ -50,7 +50,7 @@ const BREACHES = [
     records: "15 million records",
     severity: "MEDIUM",
     description: "Email addresses scraped via public API and combined with profile data, then published on a hacking forum.",
-    learnMoreUrl: "https://www.google.com/search?q=Trello+data+breach+2024",
+    learnMoreUrl: "https://www.bleepingcomputer.com/news/security/trello-api-abused-to-link-email-addresses-to-15-million-accounts/",
   },
 ];
 

@@ -170,11 +170,43 @@ export default function Dashboard() {
             )}
 
             <div className="space-y-3">
-              {!loading &&
-                filteredEntries.slice(0, 5).map((entry) => (
-                  <VaultEntryCard key={entry.entry_id} entry={entry} />
-                ))}
+  {!loading &&
+    filteredEntries.slice(0, 4).map((entry) => {
+      const favicon = entry.url
+        ? `https://www.google.com/s2/favicons?domain=${entry.url}&sz=64`
+        : null;
+      const fallback = entry.title.slice(0, 1).toUpperCase();
+      return (
+        <div
+          key={entry.entry_id}
+          className="flex items-center gap-3 p-3 rounded-2xl"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          {favicon ? (
+            <img
+              src={favicon}
+              alt=""
+              className="h-10 w-10 rounded-xl bg-white object-contain p-1.5 shadow-sm flex-shrink-0"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[rgba(108,99,255,0.12)] text-sm font-bold text-[var(--primary)] flex-shrink-0">
+              {fallback}
             </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-[var(--text)] truncate">{entry.title}</p>
+            <p className="text-xs text-[var(--muted)] truncate">{entry.username}</p>
+          </div>
+        </div>
+            );
+          })}
+          </div>
           </div>
 
           {/* QUICK ACTIONS */}

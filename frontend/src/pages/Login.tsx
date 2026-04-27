@@ -38,9 +38,7 @@ export default function Login() {
 
     if (error) return setError(error.message);
 
-    // Capture the login password — used as master password for vault encryption.
     setMasterPassword(password);
-
     navigate("/dashboard", { replace: true });
   };
 
@@ -61,11 +59,45 @@ export default function Login() {
     <AuthLayout>
       <div className="w-full max-w-md mx-auto">
         <div className="rounded-[28px] bg-[var(--surface)] border border-[var(--border)] p-6 shadow-sm dark:shadow-none">
-          <h1 className="text-2xl font-bold text-[var(--text)] mb-2">Sign in</h1>
-          <p className="mb-6 text-sm text-[var(--muted)]">Access your vault securely.</p>
+          {/* HEADER WITH LOGO */}
+          <div className="flex items-center gap-4 mb-6">
+            <div
+              className="flex items-center justify-center rounded-2xl flex-shrink-0"
+              style={{
+                width: 56,
+                height: 56,
+                background: "var(--surface)",
+                border: "2px solid var(--primary)",
+              }}
+            >
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12.5l5 5 9-9"
+                  stroke="#22c55e"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-[var(--text)]">SecureVault</h1>
+              <p className="text-sm text-[var(--muted)]">Sign in. Access your vault securely.</p>
+            </div>
+          </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            <Input label="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              label="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
             <Input
               label="Password"
               type="password"
