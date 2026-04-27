@@ -1,24 +1,27 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchVaultEntries, deleteVaultEntry } from "../services/vault";
+import {
+  fetchVaultEntries,
+  deleteVaultEntry,
+} from "../services/vault";
+import type { VaultEntry } from "../types/vault";
 
 export function useVaultEntries() {
-  const [entries, setEntries] = useState<any[]>([]);
+  const [entries, setEntries] = useState<VaultEntry[]>([]);
+  const [reusedCount, setReusedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const loadEntries = useCallback(async () => {
     setLoading(true);
     setError("");
-
     try {
       const data = await fetchVaultEntries();
-
-      console.log("HOOK DATA:", data); // 🔥 DEBUG
-
-      setEntries(data || []);
+      setEntries(data.entries || []);
+      setReusedCount(data.reused_count || 0);
     } catch (err) {
       console.error("Vault load failed:", err);
       setEntries([]);
+      setReusedCount(0);
       setError("Failed to load vault entries.");
     } finally {
       setLoading(false);
@@ -32,7 +35,7 @@ export function useVaultEntries() {
   const removeEntry = async (id: string) => {
     try {
       await deleteVaultEntry(id);
-      setEntries((prev) => prev.filter((e) => e.id !== id));
+      setEntries((prev) => prev.filter((e) => e.entry_id !== id));
     } catch (err) {
       console.error("Delete failed:", err);
     }
@@ -40,6 +43,7 @@ export function useVaultEntries() {
 
   return {
     entries,
+    reusedCount,
     loading,
     error,
     reload: loadEntries,

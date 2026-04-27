@@ -1,167 +1,210 @@
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "../layouts/AppLayout";
 import { useVaultEntries } from "../hooks/useVaultEntries";
 
+const BREACHES = [
+  {
+    name: "National Public Data",
+    date: "Aug 2024",
+    records: "2.9 billion records",
+    severity: "CRITICAL",
+    description: "Social Security numbers, names, addresses, and phone numbers leaked from a background-check data broker.",
+    learnMoreUrl: "https://www.google.com/search?q=National+Public+Data+breach+2024",
+  },
+  {
+    name: "Ticketmaster / Live Nation",
+    date: "May 2024",
+    records: "560 million records",
+    severity: "HIGH",
+    description: "Customer names, addresses, phone numbers, and partial payment card data exposed by the ShinyHunters group.",
+    learnMoreUrl: "https://www.google.com/search?q=Ticketmaster+Live+Nation+breach+2024",
+  },
+  {
+    name: "AT&T",
+    date: "Jul 2024",
+    records: "110 million records",
+    severity: "HIGH",
+    description: "Call and text metadata for nearly all AT&T wireless customers exposed from a third-party cloud platform.",
+    learnMoreUrl: "https://www.google.com/search?q=ATT+data+breach+2024",
+  },
+  {
+    name: "Dell",
+    date: "May 2024",
+    records: "49 million records",
+    severity: "MEDIUM",
+    description: "Customer order data including names, physical addresses, and Dell hardware details posted to a hacking forum.",
+    learnMoreUrl: "https://www.google.com/search?q=Dell+data+breach+2024",
+  },
+  {
+    name: "Change Healthcare",
+    date: "Feb 2024",
+    records: "100 million+ records",
+    severity: "CRITICAL",
+    description: "Largest healthcare data breach in US history. Patient records, insurance details, and medical histories exposed.",
+    learnMoreUrl: "https://www.google.com/search?q=Change+Healthcare+UnitedHealth+breach+2024",
+  },
+  {
+    name: "Trello",
+    date: "Jan 2024",
+    records: "15 million records",
+    severity: "MEDIUM",
+    description: "Email addresses scraped via public API and combined with profile data, then published on a hacking forum.",
+    learnMoreUrl: "https://www.google.com/search?q=Trello+data+breach+2024",
+  },
+];
+
+const SEVERITY_BG: Record<string, string> = {
+  CRITICAL: "#ef4444",
+  HIGH: "#f97316",
+  MEDIUM: "#eab308",
+};
+
 export default function Reports() {
-  const { entries = [], loading } = useVaultEntries();
+  const { entries = [], reusedCount, loading, error, reload } = useVaultEntries();
+  const navigate = useNavigate();
 
-  // Reused passwords
-  const reused = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    entries.forEach((e) => {
-      if (!map[e.password]) map[e.password] = [];
-      map[e.password].push(e);
-    });
-
-    return Object.values(map)
-      .filter((group) => group.length > 1)
-      .map((group) => ({
-        count: group.length,
-        entries: group,
-      }));
-  }, [entries]);
-
-  // Weak passwords
-  const weak = useMemo(() => {
-    return entries.filter((e) => e.password.length < 8);
-  }, [entries]);
-
-  // Health score
-  const healthScore = Math.max(
-    0,
-    100 - weak.length * 10 - reused.length * 10
+  const weak = useMemo(
+    () => entries.filter((e) => e.password_strength != null && e.password_strength <= 2),
+    [entries]
   );
+  const reused = useMemo(() => entries.filter((e) => e.is_reused), [entries]);
+  const healthScore = Math.max(0, 100 - weak.length * 10 - reusedCount * 10);
+
+  const goToEdit = (id: string) => navigate("/vault", { state: { editEntryId: id } });
+
+  const cardStyle = {
+    background: "var(--gradient-card)",
+    border: "1px solid var(--border)",
+    boxShadow: "var(--shadow-soft)",
+  };
+  const rowStyle = {
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+  };
 
   return (
     <AppLayout>
       <div className="space-y-6 max-w-3xl mx-auto px-4">
-
-        {/* HEADER */}
         <div>
           <h1 className="text-3xl font-bold">Security Reports</h1>
-          <p className="text-[var(--muted)] mt-1">
-            Your vault health and recent public data breaches
-          </p>
+          <p className="text-[var(--muted)] mt-1">Your vault health and recent public data breaches</p>
         </div>
 
-        {/* LOADING */}
-        {loading && (
-          <p className="text-sm text-[var(--muted)]">
-            Loading reports...
-          </p>
+        {loading && <p className="text-sm text-[var(--muted)]">Loading reports...</p>}
+
+        {error && (
+          <div className="flex items-center justify-between rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
+            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+            <button onClick={reload} className="text-sm font-semibold text-red-700 dark:text-red-300 hover:underline">Retry</button>
+          </div>
         )}
 
-        {/* VAULT HEALTH */}
-        <div className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-6 shadow-md">
+        <div className="rounded-[28px] p-6" style={cardStyle}>
           <h2 className="text-lg font-semibold mb-4">Vault Health</h2>
-
           <div className="flex justify-between text-center">
             <div className="flex-1">
-              <p className="text-2xl font-bold text-[var(--primary)]">
-                {entries.length}
-              </p>
+              <p className="text-2xl font-bold text-[var(--primary)]">{entries.length}</p>
               <p className="text-xs text-[var(--muted)]">Total entries</p>
             </div>
-
             <div className="flex-1">
-              <p className="text-2xl font-bold text-green-500">
-                {healthScore}%
-              </p>
+              <p className="text-2xl font-bold text-green-500">{healthScore}%</p>
               <p className="text-xs text-[var(--muted)]">Health score</p>
             </div>
-
             <div className="flex-1">
-              <p className="text-2xl font-bold text-yellow-500">
-                {weak.length}
-              </p>
+              <p className="text-2xl font-bold text-yellow-500">{weak.length}</p>
               <p className="text-xs text-[var(--muted)]">Weak</p>
             </div>
           </div>
         </div>
 
-        {/* ALERT */}
-        <div className="flex items-start gap-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-2xl p-4 text-sm text-black dark:text-yellow-200 shadow-sm">
+        <div className="flex items-start gap-3 rounded-2xl p-4 text-sm shadow-sm"
+              style={{
+                background: "#fdf6e3",
+                border: "1px solid #ecd9a0",
+                color: "#8b6914",
+                  }}
+>
   <span className="text-lg">💡</span>
-  <p>
-    If a service you use appears below, change your password immediately — especially if reused elsewhere.
-  </p>
+  <p>If a service you use appears below , change your password immediately — especially if reused elsewhere.</p>
 </div>
 
-        {/* WEAK PASSWORDS */}
-        <div className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-6 shadow-md space-y-3">
+        <div className="rounded-[28px] p-6 space-y-3" style={cardStyle}>
           <h2 className="text-lg font-semibold">Weak Passwords</h2>
-
           {weak.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">All clear!</p>
           ) : (
             weak.map((item) => (
-              <div
-                key={item.id}
-                className="flex justify-between items-center p-3 rounded-xl bg-[var(--surface-2)] dark:bg-[#0f172a]"
-              >
+              <button key={item.entry_id} onClick={() => goToEdit(item.entry_id)} className="w-full flex justify-between items-center p-3 rounded-xl transition text-left hover:opacity-80" style={rowStyle}>
                 <div>
-                  <p className="font-medium">{item.siteName}</p>
-                  <p className="text-xs text-[var(--muted)]">
-                    {item.username}
-                  </p>
+                  <p className="font-medium text-[var(--text)]">{item.title}</p>
+                  <p className="text-xs text-[var(--muted)]">{item.username}</p>
                 </div>
-
-                <span className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 rounded-full">
+                <span
+                  className="text-xs font-bold uppercase px-2 py-1 rounded-full"
+                  style={{ background: "#ef4444", color: "white" }}
+                >
                   Weak
                 </span>
-              </div>
+              </button>
             ))
           )}
         </div>
 
-        {/* REUSED PASSWORDS */}
-        <div className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-6 shadow-md space-y-3">
+        <div className="rounded-[28px] p-6 space-y-3" style={cardStyle}>
           <h2 className="text-lg font-semibold">Reused Passwords</h2>
-
           {reused.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">All clear!</p>
           ) : (
-            reused.map((group, index) => (
-              <div
-                key={index}
-                className="p-3 rounded-xl bg-[var(--surface-2)] dark:bg-[#0f172a] space-y-2"
-              >
-                <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-300">
-                  Used {group.count} times
-                </p>
-
-                {group.entries.map((entry) => (
-                  <div key={entry.id} className="text-sm">
-                    {entry.siteName} ({entry.username})
+            <>
+              <p className="text-sm text-[var(--muted)]">{reused.length} entries share a password with at least one other entry.</p>
+              {reused.map((item) => (
+                <button key={item.entry_id} onClick={() => goToEdit(item.entry_id)} className="w-full flex justify-between items-center p-3 rounded-xl transition text-left hover:opacity-80" style={rowStyle}>
+                  <div>
+                    <p className="font-medium text-[var(--text)]">{item.title}</p>
+                    <p className="text-xs text-[var(--muted)]">{item.username}</p>
                   </div>
-                ))}
-              </div>
-            ))
+                  <span
+                    className="text-xs font-bold uppercase px-2 py-1 rounded-full"
+                    style={{ background: "#eab308", color: "white" }}
+                  >
+                    Reused
+                  </span>
+                </button>
+              ))}
+            </>
           )}
         </div>
 
-        {/* BREACHES */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Recent Data Breaches</h2>
-
-          <p className="text-xs text-[var(--muted)]">
-            Static demo data
-          </p>
-
-          <div className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-5 shadow-md">
-            <div className="flex justify-between">
-              <p className="font-semibold">National Public Data</p>
-              <span className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 rounded-full">
-                CRITICAL
-              </span>
-            </div>
-
-            <p className="text-xs text-[var(--muted)] mt-1">
-              Aug 2024 • 2.9B records
-            </p>
+          <div className="space-y-3">
+            {BREACHES.map((breach) => (
+              <div key={breach.name} className="rounded-[28px] p-5 space-y-2" style={cardStyle}>
+                <div className="flex justify-between items-start gap-3">
+                  <p className="font-semibold text-[var(--text)] flex-1">{breach.name}</p>
+                  <span
+                    className="text-xs font-bold uppercase px-2 py-1 rounded-full flex-shrink-0"
+                    style={{ background: SEVERITY_BG[breach.severity], color: "white" }}
+                  >
+                    {breach.severity}
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--muted)]">{breach.date} • {breach.records}</p>
+                <p className="text-sm text-[var(--text)] opacity-90 leading-relaxed">{breach.description}</p>
+                <a href={breach.learnMoreUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-xs font-bold text-[var(--primary)] uppercase hover:underline pt-1">Learn more</a>
+              </div>
+            ))}
           </div>
         </div>
 
+        <div className="rounded-[28px] p-6 space-y-3" style={cardStyle}>
+          <h2 className="text-lg font-semibold">Check Your Email</h2>
+          <p className="text-sm text-[var(--text)] opacity-90 leading-relaxed">
+            Visit <a href="https://haveibeenpwned.com" target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] font-semibold hover:underline">haveibeenpwned.com</a> to check if any of your email addresses have appeared in a known data breach.
+          </p>
+          <a href="https://haveibeenpwned.com" target="_blank" rel="noopener noreferrer" className="inline-block text-xs font-bold text-[var(--primary)] uppercase hover:underline pt-1">Check now</a>
+        </div>
       </div>
     </AppLayout>
   );

@@ -5,7 +5,6 @@ export default function GeneratorPage() {
   return (
     <AppLayout>
       <div className="space-y-6 max-w-3xl mx-auto px-4">
-
         {/* HEADER */}
         <div>
           <h1 className="text-3xl font-bold">Generator</h1>
@@ -15,10 +14,16 @@ export default function GeneratorPage() {
         </div>
 
         {/* GENERATOR CARD */}
-        <div className="rounded-[28px] bg-white dark:bg-[var(--surface-2)] p-6 shadow-md">
+        <div
+          className="rounded-[28px] p-6"
+          style={{
+            background: "var(--gradient-card)",
+            border: "1px solid var(--border)",
+            boxShadow: "var(--shadow-soft)",
+          }}
+        >
           <Generator />
         </div>
-
       </div>
     </AppLayout>
   );

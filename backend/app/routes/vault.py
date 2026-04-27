@@ -273,7 +273,7 @@ def create_vault_entry():
 
 # GET /vault/<entry_id> — single entry with decrypted password
 
-@vault_bp.route("/<uuid:entry_id>", methods=["GET"])
+@vault_bp.route("/<uuid:entry_id>", methods=["GET", "POST"])
 @require_auth
 def get_vault_entry(entry_id):
     """

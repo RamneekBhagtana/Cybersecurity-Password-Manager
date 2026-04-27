@@ -1,51 +1,109 @@
 import secrets
 import string
+import math
 from flask import Blueprint, request, jsonify
 from app.utils.auth import require_auth
 
 generator_bp = Blueprint("generator", __name__, url_prefix="/generator")
 
 
+def calculate_strength(length, charset_size):
+    entropy = length * math.log2(charset_size) if charset_size > 0 else 0
+
+    if entropy < 40:
+        level = "weak"
+    elif entropy < 60:
+        level = "medium"
+    else:
+        level = "strong"
+
+    return {
+        "entropy": round(entropy, 2),
+        "level": level
+    }
+
+
+def load_eff_words():
+    try:
+        with open("eff_long.txt") as f:
+            return [line.strip().split()[-1] for line in f.readlines()]
+    except:
+        return ["secure", "vault", "random", "token"]
+
+
 @generator_bp.route("/password", methods=["POST"])
-@require_auth
 def generate_password():
     data = request.get_json() or {}
-    length = int(data.get("length", 16))
-    length = max(8, min(128, length))  # clamp
+
+    length = max(8, min(128, int(data.get("length", 16))))
+
+    include_upper = data.get("include_uppercase", True)
+    include_lower = data.get("include_lowercase", True)
+    include_numbers = data.get("include_numbers", True)
+    include_special = data.get("include_special", True)
+
+    min_numbers = int(data.get("min_numbers", 0))
+    min_special = int(data.get("min_special", 0))
 
     charset = ""
-    if data.get("include_uppercase", True):
+    if include_upper:
         charset += string.ascii_uppercase
-    if data.get("include_lowercase", True):
+    if include_lower:
         charset += string.ascii_lowercase
-    if data.get("include_numbers", True):
+    if include_numbers:
         charset += string.digits
-    if data.get("include_symbols", True):
+    if include_special:
         charset += "!@#$%^&*"
-    if not charset:
-        charset = string.ascii_lowercase
 
-    password = "".join(secrets.choice(charset) for _ in range(length))
-    return jsonify({"password": password})
+    if not charset:
+        return jsonify({"error": "At least one character type required"}), 400
+
+    password_chars = []
+
+    for _ in range(min_numbers):
+        password_chars.append(secrets.choice(string.digits))
+
+    for _ in range(min_special):
+        password_chars.append(secrets.choice("!@#$%^&*"))
+
+    while len(password_chars) < length:
+        password_chars.append(secrets.choice(charset))
+
+    secrets.SystemRandom().shuffle(password_chars)
+    password = "".join(password_chars)
+
+    return jsonify({
+        "password": password,
+        "strength": calculate_strength(length, len(charset))
+    })
 
 
 @generator_bp.route("/passphrase", methods=["POST"])
-@require_auth
 def generate_passphrase():
-    # Tiny wordlist; full EFF list is 7776 words — Task 17's real impl
-    words = ["apple", "bridge", "cactus", "dolphin", "eagle", "forest",
-             "guitar", "hammer", "island", "jungle", "kitten", "lemon",
-             "mountain", "noodle", "ocean", "pillow", "quartz", "river",
-             "silver", "tiger", "umbrella", "valley", "window", "yellow"]
+    words_list = load_eff_words()
 
     data = request.get_json() or {}
-    count = int(data.get("words", 4))
-    count = max(3, min(10, count))
-    separator = data.get("separator", "-")
-    capitalize = bool(data.get("capitalize", False))
 
-    chosen = [secrets.choice(words) for _ in range(count)]
+    count = max(3, min(10, int(data.get("words", 4))))
+    separator = data.get("separator", "-")
+
+    if len(separator) < 1 or len(separator) > 2:
+        return jsonify({"error": "Separator must be 1-2 characters"}), 400
+
+    capitalize = bool(data.get("capitalize", False))
+    include_number = bool(data.get("include_number", False))
+
+    chosen = [secrets.choice(words_list) for _ in range(count)]
+
     if capitalize:
         chosen = [w.capitalize() for w in chosen]
 
-    return jsonify({"passphrase": separator.join(chosen)})
+    passphrase = separator.join(chosen)
+
+    if include_number:
+        passphrase += separator + str(secrets.randbelow(100))
+
+    return jsonify({
+        "passphrase": passphrase,
+        "strength": calculate_strength(count, len(words_list))
+    })
