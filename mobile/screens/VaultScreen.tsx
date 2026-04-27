@@ -16,6 +16,7 @@ import {
     Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import apiClient from '../lib/apiClient';
 import { useTheme } from '../lib/ThemeContext';
 
@@ -73,6 +74,329 @@ function getIconStyle(title: string): { initial: string; bg: string } {
     const idx = title.toUpperCase().charCodeAt(0) % ICON_COLORS.length;
     return { initial: title.charAt(0).toUpperCase(), bg: ICON_COLORS[idx] };
 }
+
+// ── Password Actions Sheet (copy / view) ─────────────────────────
+type PasswordActionsSheetProps = {
+    visible: boolean;
+    entry: VaultEntry | null;
+    purple: string;
+    onClose: () => void;
+};
+
+function PasswordActionsSheet({ visible, entry, purple, onClose }: PasswordActionsSheetProps) {
+    const { theme } = useTheme();
+
+    type SheetMode = 'menu' | 'input' | 'view';
+    const [mode, setMode] = useState<SheetMode>('menu');
+    const [pendingAction, setPendingAction] = useState<'copy' | 'view'>('copy');
+    const [masterPassword, setMasterPassword] = useState('');
+    const [showMaster, setShowMaster] = useState(false);
+    const [revealedPassword, setRevealedPassword] = useState('');
+    const [showRevealed, setShowRevealed] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    // Reset state each time the sheet opens
+    useEffect(() => {
+        if (visible) {
+            setMode('menu');
+            setMasterPassword('');
+            setShowMaster(false);
+            setRevealedPassword('');
+            setShowRevealed(false);
+            setLoading(false);
+        }
+    }, [visible]);
+
+    const startAction = (action: 'copy' | 'view') => {
+        setPendingAction(action);
+        setMode('input');
+    };
+
+    const handleConfirm = async () => {
+        if (!masterPassword.trim() || !entry) return;
+        setLoading(true);
+        try {
+            // POST /vault/:id/decrypt — avoids non-standard GET-with-body
+            const res = await apiClient.post(`/vault/${entry.entry_id}/decrypt`, {
+                master_password: masterPassword.trim(),
+            });
+            const pwd: string = res.data.password ?? '';
+
+            if (pendingAction === 'copy') {
+                await Clipboard.setStringAsync(pwd);
+                onClose();
+                Alert.alert('Copied', `Password for "${entry.title}" copied to clipboard.`);
+            } else {
+                setRevealedPassword(pwd);
+                setMode('view');
+            }
+        } catch (err: any) {
+            const msg: string =
+                err.response?.data?.error?.message ??
+                err.message ??
+                '';
+            const isWrongPassword =
+                msg.toLowerCase().includes('decryption failed') ||
+                msg.toLowerCase().includes('check your master password');
+            const isTimeout =
+                err.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout');
+
+            if (isWrongPassword) {
+                Alert.alert('Incorrect', 'Wrong master password — please try again.');
+            } else if (isTimeout) {
+                Alert.alert('Timed Out', 'Request timed out. Check your connection and try again.');
+            } else {
+                Alert.alert('Error', msg || 'Failed to decrypt entry.');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const inputBase = [
+        formStyles.input,
+        { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border },
+    ];
+
+    return (
+        <Modal
+            visible={visible}
+            transparent
+            animationType="slide"
+            onRequestClose={onClose}
+        >
+            {/* Tap backdrop to dismiss */}
+            <TouchableOpacity
+                style={sheetStyles.backdrop}
+                activeOpacity={1}
+                onPress={onClose}
+            />
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={sheetStyles.sheetWrapper}
+            >
+                <View style={[sheetStyles.sheet, { backgroundColor: theme.card }]}>
+                    {/* Handle bar */}
+                    <View style={[sheetStyles.handle, { backgroundColor: theme.border }]} />
+
+                    {/* Title */}
+                    <Text style={[sheetStyles.entryTitle, { color: theme.text }]} numberOfLines={1}>
+                        {entry?.title}
+                    </Text>
+                    {entry?.username && (
+                        <Text style={[sheetStyles.entryUsername, { color: theme.placeholder }]} numberOfLines={1}>
+                            {entry.username}
+                        </Text>
+                    )}
+
+                    <View style={[sheetStyles.divider, { backgroundColor: theme.divider }]} />
+
+                    {/* ── Menu mode ── */}
+                    {mode === 'menu' && (
+                        <>
+                            <TouchableOpacity
+                                style={sheetStyles.actionRow}
+                                onPress={() => startAction('copy')}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={sheetStyles.actionIcon}>📋</Text>
+                                <View>
+                                    <Text style={[sheetStyles.actionLabel, { color: theme.text }]}>Copy Password</Text>
+                                    <Text style={[sheetStyles.actionSub, { color: theme.placeholder }]}>Copies to clipboard</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={sheetStyles.actionRow}
+                                onPress={() => startAction('view')}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={sheetStyles.actionIcon}>👁</Text>
+                                <View>
+                                    <Text style={[sheetStyles.actionLabel, { color: theme.text }]}>View Password</Text>
+                                    <Text style={[sheetStyles.actionSub, { color: theme.placeholder }]}>Reveals the current password</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[sheetStyles.cancelBtn, { borderColor: theme.border }]}
+                                onPress={onClose}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[sheetStyles.cancelText, { color: theme.placeholder }]}>Cancel</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
+
+                    {/* ── Master password input mode ── */}
+                    {mode === 'input' && (
+                        <>
+                            <Text style={[formStyles.label, { color: '#F59E0B', marginTop: 4 }]}>
+                                MASTER PASSWORD
+                            </Text>
+                            <View style={[
+                                formStyles.input,
+                                formStyles.rowInput,
+                                { backgroundColor: theme.inputBg, borderColor: theme.border },
+                            ]}>
+                                <TextInput
+                                    style={[formStyles.rowInputField, { color: theme.text }]}
+                                    value={masterPassword}
+                                    onChangeText={setMasterPassword}
+                                    placeholder="Enter master password"
+                                    placeholderTextColor={theme.placeholder}
+                                    secureTextEntry={!showMaster}
+                                    autoCapitalize="none"
+                                    autoFocus
+                                />
+                                <TouchableOpacity onPress={() => setShowMaster(v => !v)} style={formStyles.eyeBtn}>
+                                    <Text style={{ fontSize: 16 }}>{showMaster ? '🙈' : '👁'}</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <TouchableOpacity
+                                style={[formStyles.saveBtn, { backgroundColor: purple, marginTop: 16, opacity: loading ? 0.7 : 1 }]}
+                                onPress={handleConfirm}
+                                disabled={loading || !masterPassword.trim()}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={formStyles.saveBtnText}>
+                                    {loading
+                                        ? 'Decrypting…'
+                                        : pendingAction === 'copy' ? 'Copy Password' : 'Reveal Password'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[sheetStyles.cancelBtn, { borderColor: theme.border, marginTop: 10 }]}
+                                onPress={() => setMode('menu')}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[sheetStyles.cancelText, { color: theme.placeholder }]}>Back</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
+
+                    {/* ── View / reveal mode ── */}
+                    {mode === 'view' && (
+                        <>
+                            <Text style={[formStyles.label, { color: theme.subtext, marginTop: 4 }]}>
+                                PASSWORD
+                            </Text>
+                            <View style={[
+                                formStyles.input,
+                                formStyles.rowInput,
+                                { backgroundColor: theme.inputBg, borderColor: theme.border },
+                            ]}>
+                                <Text
+                                    style={[formStyles.rowInputField, { color: theme.text, paddingVertical: 12 }]}
+                                    selectable
+                                >
+                                    {showRevealed ? revealedPassword : '•'.repeat(Math.min(revealedPassword.length, 24))}
+                                </Text>
+                                <TouchableOpacity onPress={() => setShowRevealed(v => !v)} style={formStyles.eyeBtn}>
+                                    <Text style={{ fontSize: 16 }}>{showRevealed ? '🙈' : '👁'}</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <TouchableOpacity
+                                style={[formStyles.saveBtn, { backgroundColor: purple, marginTop: 16 }]}
+                                onPress={async () => {
+                                    await Clipboard.setStringAsync(revealedPassword);
+                                    onClose();
+                                    Alert.alert('Copied', `Password for "${entry?.title}" copied to clipboard.`);
+                                }}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={formStyles.saveBtnText}>Copy to Clipboard</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[sheetStyles.cancelBtn, { borderColor: theme.border, marginTop: 10 }]}
+                                onPress={onClose}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[sheetStyles.cancelText, { color: theme.placeholder }]}>Done</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
+                </View>
+            </KeyboardAvoidingView>
+        </Modal>
+    );
+}
+
+const sheetStyles = StyleSheet.create({
+    backdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    sheetWrapper: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+    },
+    sheet: {
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 40,
+    },
+    handle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    entryTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        textAlign: 'center',
+        marginBottom: 2,
+    },
+    entryUsername: {
+        fontSize: 13,
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    divider: {
+        height: 1,
+        marginBottom: 16,
+    },
+    actionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        paddingVertical: 14,
+    },
+    actionIcon: {
+        fontSize: 22,
+        width: 30,
+        textAlign: 'center',
+    },
+    actionLabel: {
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    actionSub: {
+        fontSize: 12,
+        marginTop: 1,
+    },
+    cancelBtn: {
+        borderRadius: 12,
+        borderWidth: 1.5,
+        paddingVertical: 13,
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    cancelText: {
+        fontSize: 15,
+        fontWeight: '600',
+    },
+});
 
 // ── Add / Edit Entry Modal ────────────────────────────────────────
 type EntryFormProps = {
@@ -788,6 +1112,7 @@ export default function VaultScreen() {
     const [editingEntry, setEditingEntry] = useState<VaultEntry | null>(null);
     const [manageCatsVisible, setManageCatsVisible] = useState(false);
     const [rateAllVisible, setRateAllVisible] = useState(false);
+    const [actionEntry, setActionEntry] = useState<VaultEntry | null>(null);
     const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
 
     // ── Load / persist category order ─────────────────────────
@@ -879,8 +1204,6 @@ export default function VaultScreen() {
             Alert.alert('Error', msg);
         }
     }, [fetchVault]);
-
-    const onRefresh = () => { setRefreshing(true); fetchVault(); };
 
     // ── Filter entries by active tag ──────────────────────────
     const filtered =
@@ -1058,7 +1381,18 @@ export default function VaultScreen() {
                                     )}
                                 </View>
                             </View>
-                            <Text style={[styles.chevron, { color: theme.border }]}>›</Text>
+                            {/* ⋯ opens copy/view sheet — tap stops card press propagation */}
+                            <TouchableOpacity
+                                style={styles.dotsBtn}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                onPress={e => {
+                                    e.stopPropagation();
+                                    setActionEntry(item);
+                                }}
+                                activeOpacity={0.6}
+                            >
+                                <Text style={[styles.dotsText, { color: theme.subtext }]}>⋯</Text>
+                            </TouchableOpacity>
                         </TouchableOpacity>
                     );
                 }}
@@ -1102,6 +1436,14 @@ export default function VaultScreen() {
                 purple={PURPLE}
                 onClose={() => setRateAllVisible(false)}
                 onDone={fetchVault}
+            />
+
+            {/* Copy / View password sheet */}
+            <PasswordActionsSheet
+                visible={actionEntry !== null}
+                entry={actionEntry}
+                purple={PURPLE}
+                onClose={() => setActionEntry(null)}
             />
         </SafeAreaView>
     );
@@ -1207,6 +1549,14 @@ const styles = StyleSheet.create({
         paddingVertical: 1,
     },
     reusedBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+    dotsBtn: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginLeft: 4,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    dotsText: { fontSize: 20, fontWeight: '700', letterSpacing: 1 },
     chevron: { fontSize: 24, fontWeight: '300', marginLeft: 6 },
     fab: {
         position: 'absolute',

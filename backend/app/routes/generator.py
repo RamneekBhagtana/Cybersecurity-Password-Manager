@@ -91,12 +91,12 @@ def generate_passphrase():
         return jsonify({"error": "Separator must be 1-2 characters"}), 400
 
     capitalize = bool(data.get("capitalize", False))
-    include_number = bool(data.get("include_number", False))
-
-    chosen = [secrets.choice(words_list) for _ in range(count)]
 
     if capitalize:
         chosen = [w.capitalize() for w in chosen]
+    if include_number:
+        digit = str(secrets.randbelow(10))
+        chosen[-1] = chosen[-1] + digit
 
     passphrase = separator.join(chosen)
 

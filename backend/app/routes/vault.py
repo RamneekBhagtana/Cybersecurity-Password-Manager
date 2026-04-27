@@ -296,6 +296,36 @@ def get_vault_entry(entry_id):
     return jsonify(detail), 200
 
 
+# POST /vault/<entry_id>/decrypt — decrypt a single entry (mobile-friendly)
+# Identical to GET /vault/<entry_id> but uses POST so the master_password
+# travels in the request body without relying on non-standard GET semantics.
+
+@vault_bp.route("/<uuid:entry_id>/decrypt", methods=["POST"])
+@require_auth
+def decrypt_vault_entry(entry_id):
+    """
+    Decrypts and returns a single vault entry.
+    Required body: { "master_password": "..." }
+    """
+    entry = VaultEntry.query.filter_by(entry_id=entry_id, user_id=g.user_id).first()
+    if entry is None:
+        return jsonify({"error": {"code": "404", "message": "Vault entry not found.", "details": {}}}), 404
+
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": {"code": "400", "message": "Request body must be JSON.", "details": {}}}), 400
+
+    key, err = _derive_key_from_request(data)
+    if err:
+        return err
+
+    detail, err = _serialize_detail(entry, key)
+    if err:
+        return err
+
+    return jsonify(detail), 200
+
+
 
 # PUT /vault/<entry_id> — update an existing entry
 
