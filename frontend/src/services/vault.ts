@@ -1,57 +1,51 @@
 import api from "./api";
-import type { VaultEntry } from "../types/vault";
+import type { VaultEntry, VaultListResponse } from "../types/vault";
 
-type RawVaultEntry = Record<string, unknown>;
-
-function asString(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (value === null || value === undefined) return "";
-  return String(value);
+export async function fetchVaultEntries(): Promise<VaultListResponse> {
+  const { data } = await api.get<VaultListResponse>("/vault");
+  return data;
 }
 
-function unwrapEntries(data: unknown): RawVaultEntry[] {
-  if (Array.isArray(data)) {
-    return data as RawVaultEntry[];
-  }
-
-  if (
-    data &&
-    typeof data === "object" &&
-    Array.isArray((data as { data?: unknown }).data)
-  ) {
-    return (data as { data: RawVaultEntry[] }).data;
-  }
-
-  return [];
+export async function deleteVaultEntry(entryId: string): Promise<void> {
+  await api.delete(`/vault/${entryId}`);
 }
 
-function normalizeEntry(raw: RawVaultEntry): VaultEntry {
-  const id = asString(raw.id ?? raw.vault_id ?? raw._id);
-  const siteName = asString(raw.siteName ?? raw.site_name ?? raw.name ?? raw.title);
-  const website = asString(raw.website ?? raw.url ?? raw.domain);
-  const username = asString(raw.username ?? raw.login ?? raw.user ?? raw.email);
-  const password = asString(raw.password ?? raw.secret ?? raw.value);
-  const tag = asString(raw.tag ?? raw.category ?? raw.label);
-
-  return {
-    id,
-    siteName: siteName || "Untitled",
-    website: website || undefined,
-    username,
-    password,
-    tag: tag || undefined,
-  };
+// Fetches one entry w/ the decrypted password
+// Backend requires master_password in the request body
+export async function fetchVaultEntryDetail(
+  entryId: string,
+  masterPassword: string
+): Promise<VaultEntry> {
+  const { data } = await api.post<VaultEntry>(`/vault/${entryId}`, {
+    master_password: masterPassword,
+  });
+  return data;
 }
 
-export async function fetchVaultEntries(): Promise<VaultEntry[]> {
-  const response = await api.get("/vault");
-  const rawEntries = unwrapEntries(response.data);
-
-  return rawEntries
-    .map(normalizeEntry)
-    .filter((entry) => entry.id && entry.siteName);
+export async function createVaultEntry(payload: {
+  title: string;
+  password: string;
+  master_password: string;
+  username?: string;
+  url?: string;
+  notes?: string;
+  tags?: string[];
+}): Promise<{ entry_id: string }> {
+  const { data } = await api.post<{ entry_id: string }>("/vault", payload);
+  return data;
 }
 
-export async function deleteVaultEntry(id: string): Promise<void> {
-  await api.delete(`/vault/${encodeURIComponent(id)}`);
+export async function updateVaultEntry(
+  entryId: string,
+  payload: Partial<{
+    title: string;
+    username: string;
+    url: string;
+    notes: string;
+    password: string;
+    master_password: string;
+    tags: string[];
+  }>
+): Promise<void> {
+  await api.put(`/vault/${entryId}`, payload);
 }

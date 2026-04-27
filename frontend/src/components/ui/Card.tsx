@@ -1,10 +1,21 @@
-type CardProps = React.HTMLAttributes<HTMLDivElement>;
+import type { ReactNode } from "react";
 
-export default function Card({ className = "", ...props }: CardProps) {
+type CardProps = {
+  children: ReactNode;
+  className?: string;
+};
+
+export default function Card({ children, className = "" }: CardProps) {
   return (
     <div
-      className={`rounded-[28px] bg-white p-5 shadow-md shadow-slate-200/60 ${className}`}
-      {...props}
-    />
+      className={`rounded-[24px] p-5 ${className}`}
+      style={{
+        background: "var(--gradient-card)",
+        border: "1px solid var(--border)",
+        boxShadow: "var(--shadow-soft)",
+      }}
+    >
+      {children}
+    </div>
   );
 }

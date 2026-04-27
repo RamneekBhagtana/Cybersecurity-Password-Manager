@@ -1,11 +1,24 @@
-type Props = {
-  children: React.ReactNode;
-};
-
-export default function AuthLayout({ children }: Props) {
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#120f2f] via-[#25154d] to-[#0d1022] flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-[28px] bg-white p-8 shadow-xl">
+    <div
+      className="
+        min-h-screen flex items-center justify-center px-4
+        bg-[var(--bg)]
+        transition-colors
+      "
+    >
+      <div
+        className="
+          w-full max-w-md
+          rounded-[28px]
+          p-6
+          bg-[var(--surface)]
+          border border-[var(--border)]
+          shadow-sm
+          dark:shadow-none
+          text-[var(--text)]
+        "
+      >
         {children}
       </div>
     </div>

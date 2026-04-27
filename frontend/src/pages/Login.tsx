@@ -1,53 +1,134 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../layouts/AuthLayout";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import { supabase } from "../lib/supabase";
+import { useMasterPassword } from "../context/MasterPasswordContext";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { setMasterPassword } = useMasterPassword();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
-  const handleLogin = async (e: any) => {
+  const isValidEmail = (value: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
+    setMessage("");
 
+    if (!email.trim()) return setError("Please enter your email.");
+    if (!isValidEmail(email)) return setError("Invalid email.");
+    if (!password) return setError("Enter password.");
+
+    setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password,
     });
+    setLoading(false);
 
-    if (error) {
-      setError(error.message);
-      return;
-    }
+    if (error) return setError(error.message);
 
-    navigate("/dashboard");
+    setMasterPassword(password);
+    navigate("/dashboard", { replace: true });
+  };
+
+  const handleResetPassword = async () => {
+    setError("");
+    setMessage("");
+    if (!email.trim()) return setError("Enter email first.");
+
+    setResetting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    setResetting(false);
+
+    if (error) return setError(error.message);
+    setMessage("Check your email for reset link.");
   };
 
   return (
     <AuthLayout>
-      <h1 className="text-2xl font-bold mb-6">Sign in</h1>
+      <div className="w-full max-w-md mx-auto">
+        <div className="rounded-[28px] bg-[var(--surface)] border border-[var(--border)] p-6 shadow-sm dark:shadow-none">
+          {/* HEADER WITH LOGO */}
+          <div className="flex items-center gap-4 mb-6">
+            <div
+              className="flex items-center justify-center rounded-2xl flex-shrink-0"
+              style={{
+                width: 56,
+                height: 56,
+                background: "var(--surface)",
+                border: "2px solid var(--primary)",
+              }}
+            >
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12.5l5 5 9-9"
+                  stroke="#22c55e"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-[var(--text)]">SecureVault</h1>
+              <p className="text-sm text-[var(--muted)]">Sign in. Access your vault securely.</p>
+            </div>
+          </div>
 
-      <form onSubmit={handleLogin} className="space-y-4">
-        <Input label="Email" value={email} onChange={(e:any)=>setEmail(e.target.value)} />
-        <Input label="Password" type="password" value={password} onChange={(e:any)=>setPassword(e.target.value)} />
+          <form onSubmit={handleLogin} className="space-y-4">
+            <Input
+              label="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <Input
+              label="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
 
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+            <button
+              type="button"
+              onClick={handleResetPassword}
+              className="text-sm text-[var(--primary)] hover:underline"
+            >
+              {resetting ? "Sending..." : "Forgot password?"}
+            </button>
 
-        <Button className="w-full">Login</Button>
-      </form>
+            {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+            {message && <p className="text-sm text-[var(--success)]">{message}</p>}
 
-      <p className="mt-4 text-sm text-center">
-        No account?{" "}
-        <Link to="/register" className="text-[var(--primary)]">
-          Register
-        </Link>
-      </p>
+            <Button className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Login"}
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-[var(--muted)]">
+            No account?{" "}
+            <Link to="/register" className="text-[var(--primary)] font-semibold hover:underline">
+              Register
+            </Link>
+          </p>
+        </div>
+      </div>
     </AuthLayout>
   );
 }

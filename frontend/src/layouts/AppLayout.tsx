@@ -1,6 +1,4 @@
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import Button from "../components/ui/Button";
-import { supabase } from "../lib/supabase";
+import { Link, NavLink } from "react-router-dom";
 
 type Props = {
   children: React.ReactNode;
@@ -9,39 +7,33 @@ type Props = {
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `block rounded-2xl px-4 py-3 text-sm font-medium transition ${
     isActive
-      ? "bg-[rgba(108,99,255,0.12)] text-[var(--primary)]"
-      : "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+      ? "bg-[rgba(108,99,255,0.18)] text-[var(--primary)]"
+      : "text-[var(--muted)] hover:bg-[var(--surface-1)] hover:text-[var(--text)]"
   }`;
 
 export default function AppLayout({ children }: Props) {
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/login");
-  };
-
   return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] transition-colors">
       {/* HEADER */}
-      <header className="border-b border-[var(--border)] bg-white">
+      <header className="border-b border-[var(--border)] bg-[var(--bg)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <Link to="/dashboard" className="text-lg font-bold">
-            SecureVault
+          <Link to="/dashboard" className="text-lg font-bold text-[var(--text)]">
+            🔐 SecureVault
           </Link>
-
-          <Button variant="secondary" onClick={handleLogout}>
-            Sign out
-          </Button>
         </div>
       </header>
 
       {/* MAIN LAYOUT */}
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 py-6 md:grid-cols-[200px_1fr]">
-        
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 py-6 md:grid-cols-[220px_1fr]">
         {/* SIDEBAR */}
-        <aside className="rounded-[28px] bg-white p-4 shadow-md">
+        <aside
+          className="rounded-[28px] p-4 transition-colors h-fit"
+          style={{
+            background: "var(--gradient-card)",
+            border: "1px solid var(--border)",
+            boxShadow: "var(--shadow-soft)",
+          }}
+        >
           <nav className="space-y-2">
             <NavLink to="/dashboard" className={navLinkClass}>
               Dashboard
@@ -62,10 +54,7 @@ export default function AppLayout({ children }: Props) {
         </aside>
 
         {/* CONTENT */}
-        <main className="space-y-6">
-          {children}
-        </main>
-
+        <main className="space-y-6">{children}</main>
       </div>
     </div>
   );
