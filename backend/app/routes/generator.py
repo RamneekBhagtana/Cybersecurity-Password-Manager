@@ -1,8 +1,8 @@
 import secrets
 import string
 import math
+import os
 from flask import Blueprint, request, jsonify
-from app.utils.auth import require_auth
 
 generator_bp = Blueprint("generator", __name__, url_prefix="/generator")
 
@@ -25,7 +25,8 @@ def calculate_strength(length, charset_size):
 
 def load_eff_words():
     try:
-        with open("eff_long.txt") as f:
+        path = os.path.join(os.path.dirname(__file__), "eff_long.txt")
+        with open(path) as f:
             return [line.strip().split()[-1] for line in f.readlines()]
     except:
         return ["secure", "vault", "random", "token"]
@@ -81,7 +82,6 @@ def generate_password():
 @generator_bp.route("/passphrase", methods=["POST"])
 def generate_passphrase():
     words_list = load_eff_words()
-
     data = request.get_json() or {}
 
     count = max(3, min(10, int(data.get("words", 4))))
@@ -91,17 +91,18 @@ def generate_passphrase():
         return jsonify({"error": "Separator must be 1-2 characters"}), 400
 
     capitalize = bool(data.get("capitalize", False))
+    include_number = bool(data.get("include_number", False))
+
+    # ✅ FIX: create chosen first
+    chosen = [secrets.choice(words_list) for _ in range(count)]
 
     if capitalize:
         chosen = [w.capitalize() for w in chosen]
+
     if include_number:
-        digit = str(secrets.randbelow(10))
-        chosen[-1] = chosen[-1] + digit
+        chosen[-1] = chosen[-1] + str(secrets.randbelow(10))
 
     passphrase = separator.join(chosen)
-
-    if include_number:
-        passphrase += separator + str(secrets.randbelow(100))
 
     return jsonify({
         "passphrase": passphrase,

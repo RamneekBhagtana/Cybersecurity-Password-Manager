@@ -32,29 +32,26 @@ export default function Generator({ onSelect }: GeneratorProps) {
   const handleGenerate = async () => {
     setLoading(true);
     try {
-      const endpoint =
-        mode === "password" ? "/generator/password" : "/generator/passphrase";
-
-      const body =
-        mode === "password"
-          ? {
-              length: passSettings.length,
-              include_uppercase: passSettings.uppercase,
-              include_lowercase: passSettings.lowercase,
-              include_numbers: passSettings.numbers,
-              include_special: passSettings.symbols,
-              min_numbers: passSettings.min_numbers,
-              min_special: passSettings.min_special,
-            }
-          : {
-              words: phraseSettings.word_count,
-              separator: phraseSettings.separator,
-              capitalize: phraseSettings.capitalize,
-              include_number: phraseSettings.include_number,
-            };
-
-      const { data } = await api.post(endpoint, body);
-      setResult(data.password || data.passphrase);
+      if (mode === "password") {
+        const { data } = await api.post("/generator/password", {
+          length: passSettings.length,
+          include_uppercase: passSettings.uppercase,
+          include_lowercase: passSettings.lowercase,
+          include_numbers: passSettings.numbers,
+          include_special: passSettings.symbols,
+          min_numbers: passSettings.min_numbers,
+          min_special: passSettings.min_special,
+        });
+        setResult(data.password ?? "");
+      } else {
+        const { data } = await api.post("/generator/passphrase", {
+          words: phraseSettings.word_count,
+          separator: phraseSettings.separator,
+          capitalize: phraseSettings.capitalize,
+          include_number: phraseSettings.include_number,
+        });
+        setResult(data.passphrase ?? "");
+      }
     } catch (err) {
       console.error(err);
       alert("Failed to generate secret.");
@@ -71,7 +68,6 @@ export default function Generator({ onSelect }: GeneratorProps) {
         border: "1px solid var(--border)",
       }}
     >
-      {/* Mode Toggle */}
       <div
         className="flex p-1 rounded-xl mb-6"
         style={{ background: "var(--surface-1)" }}
@@ -108,7 +104,6 @@ export default function Generator({ onSelect }: GeneratorProps) {
         </button>
       </div>
 
-      {/* Result Display & Strength Meter */}
       {result && (
         <div
           className="mb-6 p-4 rounded-xl space-y-3"

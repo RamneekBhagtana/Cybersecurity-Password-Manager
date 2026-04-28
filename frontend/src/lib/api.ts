@@ -1,10 +1,6 @@
 import api from '../services/api';
 import type { GeneratorMode, PasswordSettings, PassphraseSettings } from '../types/generator';
 
-/**
- * Calls the backend generator endpoint and returns the generated secret string.
- * Maps frontend field names to the backend's expected field names.
- */
 export async function fetchGeneratedSecret(
   mode: GeneratorMode,
   settings: PasswordSettings | PassphraseSettings
@@ -16,7 +12,9 @@ export async function fetchGeneratedSecret(
       include_uppercase: s.uppercase,
       include_lowercase: s.lowercase,
       include_numbers: s.numbers,
-      include_symbols: s.symbols,
+      include_special: s.symbols,
+      min_numbers: s.min_numbers,
+      min_special: s.min_special,
     });
     return (res.data.password ?? '') as string;
   } else {
@@ -25,6 +23,7 @@ export async function fetchGeneratedSecret(
       words: s.word_count,
       separator: s.separator,
       capitalize: s.capitalize,
+      include_number: s.include_number,
     });
     return (res.data.passphrase ?? '') as string;
   }
