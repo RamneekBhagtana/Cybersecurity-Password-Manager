@@ -32,6 +32,7 @@ def load_eff_words():
 
 
 @generator_bp.route("/password", methods=["POST"])
+@require_auth
 def generate_password():
     data = request.get_json() or {}
 
@@ -79,6 +80,7 @@ def generate_password():
 
 
 @generator_bp.route("/passphrase", methods=["POST"])
+@require_auth
 def generate_passphrase():
     words_list = load_eff_words()
 
@@ -91,19 +93,16 @@ def generate_passphrase():
         return jsonify({"error": "Separator must be 1-2 characters"}), 400
 
     capitalize = bool(data.get("capitalize", False))
+    include_number = bool(data.get("include_number", False))
 
+    chosen = [secrets.choice(words_list) for _ in range(count)]
     if capitalize:
         chosen = [w.capitalize() for w in chosen]
     if include_number:
         digit = str(secrets.randbelow(10))
         chosen[-1] = chosen[-1] + digit
 
-    passphrase = separator.join(chosen)
-
-    if include_number:
-        passphrase += separator + str(secrets.randbelow(100))
-
     return jsonify({
-        "passphrase": passphrase,
+        "passphrase": separator.join(chosen),
         "strength": calculate_strength(count, len(words_list))
     })
