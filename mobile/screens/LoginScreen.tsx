@@ -45,7 +45,7 @@ export default function LoginScreen({ navigation }: Props) {
                 <View style={styles.logoContainer}>
                     <View style={styles.shieldOuter}>
                         <View style={styles.shieldInner}>
-                            <Ionicons name="checkmark" size={28} color="#fff" />
+                            <Ionicons name="checkmark" size={28} color="#22C55E" />
                         </View>
                     </View>
                     <Text style={styles.appName}>SecureVault</Text>
