@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
     View,
     Text,
@@ -44,7 +45,7 @@ export default function LoginScreen({ navigation }: Props) {
                 <View style={styles.logoContainer}>
                     <View style={styles.shieldOuter}>
                         <View style={styles.shieldInner}>
-                            <Text style={styles.checkmark}>✓</Text>
+                            <Ionicons name="checkmark" size={28} color="#22C55E" />
                         </View>
                     </View>
                     <Text style={styles.appName}>SecureVault</Text>

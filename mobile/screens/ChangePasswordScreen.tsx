@@ -1,5 +1,6 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
     View,
     Text,
@@ -141,7 +142,7 @@ export default function ChangePasswordScreen() {
                             },
                         ]}
                     >
-                        <Text style={styles.noticeEmoji}>ℹ️</Text>
+                        <Ionicons name="information-circle" size={18} color={theme.isDark ? '#93C5FD' : '#1E40AF'} style={{ marginTop: 1 }} />
                         <Text style={[styles.noticeText, { color: theme.isDark ? '#93C5FD' : '#1E40AF' }]}>
                             This changes your SecureVault account password. Make sure to use a strong, unique password that you haven't used elsewhere.
                         </Text>
@@ -236,19 +237,16 @@ export default function ChangePasswordScreen() {
 
                     {/* Match indicator */}
                     {confirmPassword.length > 0 && (
-                        <Text
-                            style={[
-                                styles.matchLabel,
-                                {
-                                    color:
-                                        newPassword === confirmPassword
-                                            ? '#22C55E'
-                                            : '#EF4444',
-                                },
-                            ]}
-                        >
-                            {newPassword === confirmPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
+                            <Ionicons
+                                name={newPassword === confirmPassword ? 'checkmark-circle' : 'close-circle'}
+                                size={14}
+                                color={newPassword === confirmPassword ? '#22C55E' : '#EF4444'}
+                            />
+                            <Text style={[styles.matchLabel, { color: newPassword === confirmPassword ? '#22C55E' : '#EF4444', marginTop: 0 }]}>
+                                {newPassword === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
+                            </Text>
+                        </View>
                     )}
 
                     {/* Save button */}

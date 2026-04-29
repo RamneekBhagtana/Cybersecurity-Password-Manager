@@ -1,5 +1,6 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
     View,
     Text,
@@ -86,21 +87,21 @@ export default function ProfileScreen() {
     };
 
     // ── Menu items ────────────────────────────────────────────
-    const menuItems = [
+    const menuItems: { iconName: keyof typeof Ionicons.glyphMap; title: string; subtitle: string; onPress: () => void }[] = [
         {
-            icon: '🔑',
+            iconName: 'key-outline',
             title: 'Change Password',
             subtitle: 'Update your account password',
             onPress: () => navigation.navigate('ChangePassword'),
         },
         {
-            icon: '📊',
+            iconName: 'bar-chart-outline',
             title: 'Security Reports',
             subtitle: 'Recent data breaches & vault health',
             onPress: () => navigation.navigate('SecurityReports'),
         },
         {
-            icon: 'ℹ️',
+            iconName: 'information-circle-outline',
             title: 'About',
             subtitle: 'SecureVault v1.0',
             onPress: () =>
@@ -155,7 +156,7 @@ export default function ProfileScreen() {
                 {/* Dark mode toggle — wired to ThemeContext */}
                 <View style={[styles.toggleCard, { backgroundColor: theme.card }]}>
                     <View style={styles.toggleLeft}>
-                        <Text style={styles.toggleIcon}>{darkMode ? '🌙' : '☀️'}</Text>
+                        <Ionicons name={darkMode ? 'moon' : 'sunny'} size={22} color={darkMode ? '#A78BFA' : '#F59E0B'} />
                         <View>
                             <Text style={[styles.toggleTitle, { color: theme.text }]}>
                                 {darkMode ? 'Dark Mode' : 'Light Mode'}
@@ -182,14 +183,14 @@ export default function ProfileScreen() {
                                 onPress={item.onPress}
                                 activeOpacity={0.7}
                             >
-                                <Text style={styles.menuIcon}>{item.icon}</Text>
+                                <Ionicons name={item.iconName} size={22} color={theme.purple} style={styles.menuIcon} />
                                 <View style={styles.menuTextContainer}>
                                     <Text style={[styles.menuTitle, { color: theme.text }]}>{item.title}</Text>
                                     <Text style={[styles.menuSubtitle, { color: theme.placeholder }]}>
                                         {item.subtitle}
                                     </Text>
                                 </View>
-                                <Text style={[styles.menuChevron, { color: theme.border }]}>›</Text>
+                                <Ionicons name="chevron-forward" size={18} color={theme.border} />
                             </TouchableOpacity>
                             {idx < menuItems.length - 1 && (
                                 <View style={[styles.divider, { backgroundColor: theme.divider }]} />
@@ -295,7 +296,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 12,
     },
-    toggleIcon: { fontSize: 22 },
     toggleTitle: {
         fontSize: 15,
         fontWeight: '700',
@@ -315,11 +315,10 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: 16,
     },
-    menuIcon: { fontSize: 22, marginRight: 14 },
+    menuIcon: { marginRight: 14 },
     menuTextContainer: { flex: 1 },
     menuTitle: { fontSize: 15, fontWeight: '700' },
     menuSubtitle: { fontSize: 12, marginTop: 2 },
-    menuChevron: { fontSize: 22, fontWeight: '300' },
     divider: {
         height: 1,
         marginLeft: 52,
